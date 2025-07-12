@@ -26,6 +26,7 @@
 #include "services/common/new_timer/new_timer.h"
 #include "services/normal/audio_endpoint.h"
 #include "services/normal/voice/transcription.h"
+#include "services/normal/voice/voice_speex.h"
 #include "services/normal/voice_endpoint.h"
 #include "syscall/syscall_internal.h"
 #include "system/logging.h"
@@ -65,6 +66,7 @@ static TimerID s_timeout = TIMER_INVALID_ID;
 static void prv_send_event(VoiceEventType event_type, VoiceStatus status,
                            PebbleVoiceServiceEventData *data);
 static void prv_session_result_timeout(void * data);
+static void prv_audio_data_handler(int16_t *samples, size_t sample_count, void *context);
 
 #if defined(VOICE_DEBUG)
 // printf implemented here because the ADT Speex debug library calls printf for logging
@@ -80,6 +82,36 @@ int printf(const char *template, ...) {
 }
 #endif
 
+static void prv_audio_data_handler(int16_t *samples, size_t sample_count, void *context) {
+  if (!voice_speex_is_initialized()) {
+    VOICE_LOG("Speex not initialized, dropping audio data");
+    return;
+  }
+
+  if (s_state != SessionState_Recording) {
+    VOICE_LOG("Not recording, dropping audio data");
+    return;
+  }
+
+  // Ensure we have the right amount of data for a frame
+  size_t expected_samples = voice_speex_get_frame_size();
+  if (sample_count != expected_samples) {
+    VOICE_LOG("Unexpected audio sample count: got %zu, expected %zu", sample_count, expected_samples);
+    return;
+  }
+
+  // Encode the audio frame
+  uint8_t encoded_buffer[200];  // Max encoded frame size
+  int encoded_bytes = voice_speex_encode_frame(samples, encoded_buffer, sizeof(encoded_buffer));
+  
+  if (encoded_bytes > 0) {
+    // Send encoded data to audio endpoint
+    audio_endpoint_add_frame(s_session_id, encoded_buffer, encoded_bytes);
+  } else {
+    VOICE_LOG("Failed to encode audio frame");
+  }
+}
+
 static void prv_teardown_session(void) {
 #if !defined(TARGET_QEMU)
   // TODO: replace stub
@@ -88,7 +120,7 @@ static void prv_teardown_session(void) {
 
 static void prv_stop_recording(void) {
 #if !defined(TARGET_QEMU)
-  // TODO: replace stub
+  mic_stop(MIC);
 #endif
 
   audio_endpoint_stop_transfer(s_session_id);
@@ -98,8 +130,7 @@ static void prv_stop_recording(void) {
 
 static void prv_cancel_recording(void) {
 #if !defined(TARGET_QEMU)
-  // TODO: reenable
-  // mic_stop(MIC);
+  mic_stop(MIC);
 #endif
 
   audio_endpoint_cancel_transfer(s_session_id);
@@ -142,8 +173,16 @@ static void prv_audio_transfer_stopped_handler(AudioEndpointSessionId session_id
 
 static void prv_start_recording(void) {
 #if !defined(TARGET_QEMU)
-  // TODO: reenable
-  // PBL_ASSERTN(mic_start(MIC, &prv_audio_data_handler, NULL, s_frame_buffer, s_frame_size));
+  // Start microphone with Speex frame buffer
+  int16_t *frame_buffer = voice_speex_get_frame_buffer();
+  size_t frame_size_samples = voice_speex_get_frame_size();  // Get frame size in samples
+  
+  if (frame_buffer && frame_size_samples > 0) {
+    PBL_ASSERTN(mic_start(MIC, &prv_audio_data_handler, NULL, frame_buffer, frame_size_samples));
+  } else {
+    PBL_LOG(LOG_LEVEL_ERROR, "Invalid Speex frame buffer");
+    return;
+  }
 #endif
 
   PBL_LOG(LOG_LEVEL_INFO, "Recording");
@@ -253,6 +292,11 @@ static VoiceStatus prv_get_status_from_result(VoiceEndpointResult result) {
 
 void voice_init(void) {
   s_lock = mutex_create();
+  
+  // Initialize Speex encoder
+  if (!voice_speex_init()) {
+    PBL_LOG(LOG_LEVEL_ERROR, "Failed to initialize Speex encoder");
+  }
 }
 
 // This will kick off a dictation session. After the setup session message is sent via the
@@ -282,13 +326,9 @@ VoiceSessionId voice_start_dictation(VoiceEndpointSessionType session_type) {
   // TODO: replace stub
 #endif
 
-  // TODO: replace fake values
-  AudioTransferInfoSpeex transfer_info = (AudioTransferInfoSpeex) {
-    .sample_rate = 0,
-    .bit_rate = 0,
-    .frame_size = 0,
-    .bitstream_version = 0,
-  };
+  // Get Speex transfer info
+  AudioTransferInfoSpeex transfer_info;
+  voice_speex_get_transfer_info(&transfer_info);
 
   s_session_id = audio_endpoint_setup_transfer(prv_audio_transfer_setup_complete_handler,
                                                prv_audio_transfer_stopped_handler);
