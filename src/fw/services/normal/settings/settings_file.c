@@ -27,6 +27,9 @@
 #include <string.h>
 #include <time.h>
 
+// Callback for settings changes (used by settings_sync)
+static SettingsFileChangeCallback s_change_callback = NULL;
+
 static status_t bootup_check(SettingsFile *file);
 static void compute_stats(SettingsFile *file);
 
@@ -265,6 +268,10 @@ status_t settings_file_rewrite_filtered(
   return status;
 }
 
+void settings_file_set_change_callback(SettingsFileChangeCallback callback) {
+  s_change_callback = callback;
+}
+
 T_STATIC status_t settings_file_compact(SettingsFile *file) {
   return settings_file_rewrite_filtered(file, NULL, NULL);
 }
@@ -481,6 +488,11 @@ status_t settings_file_set(SettingsFile *file, const void *key, size_t key_len,
     settings_raw_iter_write_header(&file->iter, &file->iter.hdr);
     file->dead_space += record_size(&file->iter.hdr);
     file->used_space -= record_size(&file->iter.hdr);
+  }
+
+  // Notify change callback if registered (for settings sync)
+  if (s_change_callback) {
+    s_change_callback(file, key, key_len, new_hdr.last_modified);
   }
 
   return S_SUCCESS;
