@@ -417,7 +417,11 @@ static NOINLINE void prv_main_task_init(void) {
 
   task_init();
 
+#if !defined(MICRO_FAMILY_SF32LB52)
+  // On SF32LB52, MPU is already configured in SystemInit() before main()
+  // to ensure proper cache coherency for BLE IPC (LPSYS RAM must be non-cacheable)
   memory_layout_setup_mpu();
+#endif
 
 #if !defined(MICRO_FAMILY_SF32LB52)
   board_early_init();

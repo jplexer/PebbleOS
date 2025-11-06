@@ -26,18 +26,23 @@
 #endif
 
 typedef enum MpuCachePolicy {
-  // FIXME(SF32LB52): system_bf0_ap.c uses now up to 4 attributes as MPU is not fully implemented.
-#ifdef MICRO_FAMILY_SF32LB52
-  MpuCachePolicy_Reserved0,
-  MpuCachePolicy_Reserved1,
-  MpuCachePolicy_Reserved2,
-  MpuCachePolicy_Reserved3,
-#endif
+  MpuCachePolicy_DeviceNGnRnE,              // Device-nGnRnE (peripherals, no gathering, reordering, early write ack)
+  MpuCachePolicy_DeviceNGnRE,               // Device-nGnRE (peripherals, no gathering/reordering, early write ack)
+  MpuCachePolicy_DeviceNGRE,                // Device-nGRE (peripherals, no gathering, early write ack)
+  MpuCachePolicy_DeviceGRE,                 // Device-GRE (peripherals, early write ack allowed)
   MpuCachePolicy_NotCacheable,
   MpuCachePolicy_WriteThrough,
   MpuCachePolicy_WriteBackWriteAllocate,
   MpuCachePolicy_WriteBackNoWriteAllocate,
 } MpuCachePolicy;
+
+// ARMv8-M Shareability attributes
+typedef enum MpuShareability {
+  MpuShareability_NonShareable = 0,   // Non-shareable
+  MpuShareability_Reserved = 1,       // Reserved (do not use)
+  MpuShareability_OuterShareable = 2, // Outer shareable
+  MpuShareability_InnerShareable = 3, // Inner shareable
+} MpuShareability;
 
 typedef struct MpuRegion {
   uint8_t region_num:4;
@@ -49,9 +54,11 @@ typedef struct MpuRegion {
   bool priv_write:1;
   bool user_read:1;
   bool user_write:1;
-  // FIXME(SF32LB52): ARMv8 MPU does not support subregions, analyze possible solutions
-#ifndef MPU_ARMV8
-  uint8_t disabled_subregions; // 8 bits, each disables 1/8 of the region.
+#ifdef MPU_ARMV8
+  bool execute_never:1;              // ARMv8-M XN bit: prevents code execution from this region
+  MpuShareability shareability:2;    // ARMv8-M shareability attribute
+#else
+  uint8_t disabled_subregions;       // ARMv7-M: 8 bits, each disables 1/8 of the region.
 #endif
 } MpuRegion;
 

@@ -100,6 +100,11 @@ void exti_configure_pin(ExtiConfig cfg, ExtiTrigger trigger, ExtiHandlerCallback
 
   uint16_t offset;
   GPIO_TypeDef *gpiox = prv_gpio_get_instance(cfg.peripheral, cfg.gpio_pin, &offset);
+  
+  // Protect against NULL peripheral
+  if (gpiox == NULL) {
+    return;
+  }
 
   switch (trigger) {
     case ExtiTrigger_Rising:
@@ -123,6 +128,9 @@ void exti_configure_pin(ExtiConfig cfg, ExtiTrigger trigger, ExtiHandlerCallback
 void exti_enable(ExtiConfig cfg) {
   uint16_t offset;
   GPIO_TypeDef *gpiox = prv_gpio_get_instance(cfg.peripheral, cfg.gpio_pin, &offset);
+  if (gpiox == NULL) {
+    return;
+  }
   if (cfg.peripheral == hwp_gpio1) {
     // Enable the EXTI line for GPIO1
     gpiox->IESR |= (1 << offset);
@@ -137,6 +145,9 @@ void exti_enable(ExtiConfig cfg) {
 void exti_disable(ExtiConfig cfg) {
   uint16_t offset;
   GPIO_TypeDef *gpiox = prv_gpio_get_instance(cfg.peripheral, cfg.gpio_pin, &offset);
+  if (gpiox == NULL) {
+    return;
+  }
   if (cfg.peripheral == hwp_gpio1) {
     // Disable the EXTI line for GPIO1
     gpiox->IECR |= (1 << offset);

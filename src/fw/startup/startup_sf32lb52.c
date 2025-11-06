@@ -35,14 +35,24 @@ extern uint8_t __retm_ro_load_start[];
 extern uint8_t __retm_ro_start[];
 extern uint8_t __retm_ro_end[];
 
+// Stack limit symbols from linker script
+extern uint32_t __isr_stack_start__[];
+extern uint32_t __stack_guard_size__[];
+
 extern int main(void);
 
 NAKED_FUNC NORETURN Reset_Handler(void) {
-  SCB_EnableICache();
-  SCB_EnableDCache();
+  // Note: Cache is enabled in SystemInit() after MPU configuration
+  // Enabling cache before MPU setup causes coherency issues with BLE IPC and flash
 
-  // FIXME(SF32LB52): Set stack limits
-  __set_MSPLIM((uint32_t)(0));
+  // Configure ARMv8-M stack limit registers for hardware stack overflow detection
+  // MSPLIM: Main Stack Pointer Limit (for privileged/ISR stack)
+  // Set to the bottom of the ISR stack (start + guard size)
+  __set_MSPLIM((uint32_t)__isr_stack_start__ + (uint32_t)__stack_guard_size__);
+  
+  // PSPLIM: Process Stack Pointer Limit (for unprivileged task stacks)
+  // Will be configured per-task by FreeRTOS during context switches
+  // Initialize to 0 for now (FreeRTOS will manage this)
   __set_PSPLIM((uint32_t)(0));
 
   // Copy data section from flash to RAM

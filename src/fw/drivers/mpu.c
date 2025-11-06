@@ -61,10 +61,10 @@ static const PermissionMapping s_permission_mappings[] = {
   // NOTE(2): we cannot have different write access for priv/unpriv, allow R/W to any level
   { false, false, false, false, 0x2 }, // AP=0b10: RO by privileged code only (1)
   { true,  true,  false, false, 0x0 }, // AP=0b00: R/W by privileged code only
-  { true,  true,  true,  false, 0x1 }, // AP=0b01: R/W by any privilege level (2)
-  { true,  true,  true,  true,  0x1 }, // AP=0b01: R/W by any privilege level
+  { true,  true,  true,  true,  0x1 }, // AP=0b01: R/W by any privilege level (most common)
+  { true,  true,  true,  false, 0x1 }, // AP=0b01: R/W by any privilege level (alias for decode)
   { true,  false, false, false, 0x2 }, // AP=0b10: RO by privileged code only
-  { true,  false, true,  false, 0x3 }, // AP=0b11: RO by by any privilege level
+  { true,  false, true,  false, 0x3 }, // AP=0b11: RO by any privilege level
 #else
   { false, false, false, false, 0x0 },
   { true,  true,  false, false, 0x1 },
@@ -78,6 +78,16 @@ static const PermissionMapping s_permission_mappings[] = {
 
 static const uint32_t s_cache_settings[] = {
 #ifdef MPU_ARMV8
+  // Device memory attributes (non-cacheable, different memory ordering guarantees)
+  [MpuCachePolicy_DeviceNGnRnE] = ARM_MPU_ATTR(ARM_MPU_ATTR_DEVICE,
+                                               ARM_MPU_ATTR_DEVICE),
+  [MpuCachePolicy_DeviceNGnRE] = ARM_MPU_ATTR(ARM_MPU_ATTR_DEVICE_nGnRE,
+                                              ARM_MPU_ATTR_DEVICE_nGnRE),
+  [MpuCachePolicy_DeviceNGRE] = ARM_MPU_ATTR(ARM_MPU_ATTR_DEVICE_nGRE,
+                                             ARM_MPU_ATTR_DEVICE_nGRE),
+  [MpuCachePolicy_DeviceGRE] = ARM_MPU_ATTR(ARM_MPU_ATTR_DEVICE_GRE,
+                                            ARM_MPU_ATTR_DEVICE_GRE),
+  // Normal memory attributes (cacheable)
   [MpuCachePolicy_NotCacheable] = ARM_MPU_ATTR(ARM_MPU_ATTR_NON_CACHEABLE,
                                                ARM_MPU_ATTR_NON_CACHEABLE),
   [MpuCachePolicy_WriteThrough] = ARM_MPU_ATTR(ARM_MPU_ATTR_MEMORY_(1, 0, 1, 0),
@@ -127,6 +137,15 @@ static uint32_t get_size_field(const MpuRegion* region) {
 
 void mpu_enable(void) {
 #ifdef MPU_ARMV8
+  // Configure all MAIR attribute indices for both device and normal memory
+  ARM_MPU_SetMemAttr(MpuCachePolicy_DeviceNGnRnE,
+                     s_cache_settings[MpuCachePolicy_DeviceNGnRnE]);
+  ARM_MPU_SetMemAttr(MpuCachePolicy_DeviceNGnRE,
+                     s_cache_settings[MpuCachePolicy_DeviceNGnRE]);
+  ARM_MPU_SetMemAttr(MpuCachePolicy_DeviceNGRE,
+                     s_cache_settings[MpuCachePolicy_DeviceNGRE]);
+  ARM_MPU_SetMemAttr(MpuCachePolicy_DeviceGRE,
+                     s_cache_settings[MpuCachePolicy_DeviceGRE]);
   ARM_MPU_SetMemAttr(MpuCachePolicy_NotCacheable,
                      s_cache_settings[MpuCachePolicy_NotCacheable]);
   ARM_MPU_SetMemAttr(MpuCachePolicy_WriteThrough,
@@ -158,8 +177,9 @@ void mpu_get_register_settings(const MpuRegion* region, uint32_t *base_address_r
   PBL_ASSERTN((region->size & 0x1f) == 0);
 
   *base_address_reg = ((region->base_address & MPU_RBAR_BASE_Msk) |
-                       ((ARM_MPU_SH_INNER << MPU_RBAR_SH_Pos) & MPU_RBAR_SH_Msk) |
-                       ((get_permission_value(region) << MPU_RBAR_AP_Pos) & MPU_RBAR_AP_Msk));
+                       ((region->shareability << MPU_RBAR_SH_Pos) & MPU_RBAR_SH_Msk) |
+                       ((get_permission_value(region) << MPU_RBAR_AP_Pos) & MPU_RBAR_AP_Msk) |
+                       ((region->execute_never << MPU_RBAR_XN_Pos) & MPU_RBAR_XN_Msk));
   *attributes_reg = (((region->base_address + region->size - 1U) & MPU_RLAR_LIMIT_Msk) |
                      ((region->cache_policy << MPU_RLAR_AttrIndx_Pos) & MPU_RLAR_AttrIndx_Msk) |
                      ((region->enabled << MPU_RLAR_EN_Pos) & MPU_RLAR_EN_Msk));
@@ -229,6 +249,8 @@ MpuRegion mpu_get_region(int region_num) {
   region.size = (rlar & MPU_RLAR_LIMIT_Msk) - region.base_address + 0x20;
   region.enabled = (rlar & MPU_RLAR_EN_Msk) != 0;
   region.cache_policy = (rlar & MPU_RLAR_AttrIndx_Msk) >> MPU_RLAR_AttrIndx_Pos;
+  region.execute_never = (rbar & MPU_RBAR_XN_Msk) >> MPU_RBAR_XN_Pos;
+  region.shareability = (rbar & MPU_RBAR_SH_Msk) >> MPU_RBAR_SH_Pos;
 
   return region;
 #else
@@ -305,10 +327,24 @@ bool mpu_memory_is_cachable(const void *addr) {
   if (!dcache_is_enabled()) {
     return false;
   }
-  // TODO PBL-37601: We're assuming only SRAM is cachable for now for simplicity sake. We should
-  // account for MPU configuration and also the fact that memory-mapped QSPI access goes through the
-  // cache.
-  return ((uint32_t)addr >= SRAM_BASE) && ((uint32_t)addr < SRAM_END);
+  
+  uint32_t addr_val = (uint32_t)addr;
+  
+  // SRAM is always cacheable
+  if (addr_val >= SRAM_BASE && addr_val < SRAM_END) {
+    return true;
+  }
+  
+#ifdef MICRO_FAMILY_SF32LB52
+  // Flash2 region (0x12000000 - 0x13ffffff) is cacheable on SF32LB52
+  if (addr_val >= 0x12000000UL && addr_val < 0x14000000UL) {
+    return true;
+  }
+#endif
+  
+  // TODO PBL-37601: We should also check MPU region configuration to determine
+  // if a region has cacheable attributes set.
+  return false;
 }
 
 void mpu_init_region_from_region(MpuRegion *copy, const MpuRegion *from, bool allow_user_access) {
