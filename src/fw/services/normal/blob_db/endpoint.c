@@ -43,9 +43,23 @@
 //! \code{.c}
 //! 0x05 <uint16_t token> <uint8_t DatabaseId>
 //! \endcode
+//!
+//! <b>VERSION:</b> This command queries the BlobDB protocol version.
+//!
+//! \code{.c}
+//! 0x0B <uint16_t token>
+//! \endcode
+//!
+//! Response:
+//! \code{.c}
+//! 0x8B <uint16_t token> <uint8_t result> <uint8_t version>
+//! \endcode
 
 //! BlobDB Endpoint ID
 static const uint16_t BLOB_DB_ENDPOINT_ID = 0xb1db;
+
+//! BlobDB Protocol Version - increment when adding new features
+static const uint8_t BLOB_DB_PROTOCOL_VERSION = 1;
 
 static const uint8_t KEY_DATA_LENGTH __attribute__((unused)) = (sizeof(uint8_t) + sizeof(uint8_t));
 static const uint8_t VALUE_DATA_LENGTH = (sizeof(uint16_t) + sizeof(uint8_t));
@@ -227,6 +241,26 @@ static void prv_handle_database_clear(CommSession *session, const uint8_t *data,
   }
 }
 
+
+static void prv_handle_version(CommSession *session, const uint8_t *data, uint32_t length) {
+  BlobDBToken token = prv_try_read_token(data, length);
+
+  struct PACKED BlobDBVersionResponseMsg {
+    BlobDBCommand command;
+    BlobDBToken token;
+    BlobDBResponse result;
+    uint8_t version;
+  } response = {
+    .command = BLOB_DB_COMMAND_VERSION_RESPONSE,
+    .token = token,
+    .result = BLOB_DB_SUCCESS,
+    .version = BLOB_DB_PROTOCOL_VERSION,
+  };
+
+  comm_session_send_data(session, BLOB_DB_ENDPOINT_ID, (uint8_t *)&response, sizeof(response),
+                         COMM_SESSION_DEFAULT_TIMEOUT);
+}
+
 static void prv_blob_db_msg_decode_and_handle(
     CommSession *session, BlobDBCommand cmd, const uint8_t *data, size_t data_length) {
   switch (cmd) {
@@ -241,6 +275,10 @@ static void prv_blob_db_msg_decode_and_handle(
     case BLOB_DB_COMMAND_CLEAR:
       PBL_LOG(LOG_LEVEL_DEBUG, "Got CLEAR");
       prv_handle_database_clear(session, data, data_length);
+      break;
+    case BLOB_DB_COMMAND_VERSION:
+      PBL_LOG(LOG_LEVEL_DEBUG, "Got VERSION");
+      prv_handle_version(session, data, data_length);
       break;
     // Commands not implemented.
     case BLOB_DB_COMMAND_READ:
