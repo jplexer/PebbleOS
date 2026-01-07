@@ -5,6 +5,8 @@
 
 #include "settings_raw_iter.h"
 
+#include <time.h>
+
 // Deleted records have their key stick around for at least DELETED_LIFETIME
 // before they can be garbage collected from the file in which they are
 // contained, that way they have time to propegate to all devices we end up
@@ -85,6 +87,24 @@ status_t settings_file_set(SettingsFile *file, const void *key, size_t key_len,
 //! @param key the key to the settings file. Note: keys can be up to 127 bytes
 //! @param key_len the length of the key
 status_t settings_file_mark_synced(SettingsFile *file, const void *key, size_t key_len);
+
+//! Mark all records as dirty (not synced) by rewriting the file.
+//! This is used to trigger a full sync of all settings.
+//! @param file the settings_file to mark dirty
+//! @note This rewrites the entire file, which can be slow for large files.
+status_t settings_file_mark_all_dirty(SettingsFile *file);
+
+//! Callback invoked when a setting is changed via settings_file_set
+//! @param file the settings file that was modified
+//! @param key the key that was set
+//! @param key_len the length of the key
+//! @param last_modified the timestamp of the change
+typedef void (*SettingsFileChangeCallback)(SettingsFile *file, const void *key, int key_len,
+                                           time_t last_modified);
+
+//! Register a callback to be invoked when settings change
+//! @param callback the callback to register (NULL to unregister)
+void settings_file_set_change_callback(SettingsFileChangeCallback callback);
 
 //! set a byte in a setting. This can only be used a byte at a time to guarantee
 //! atomicity. Do not use to modify several bytes in a row!

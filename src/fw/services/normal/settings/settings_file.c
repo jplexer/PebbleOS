@@ -14,6 +14,9 @@
 #include <string.h>
 #include <time.h>
 
+// Callback for settings changes (used by settings_sync)
+static SettingsFileChangeCallback s_change_callback = NULL;
+
 static status_t bootup_check(SettingsFile *file);
 static void compute_stats(SettingsFile *file);
 
@@ -252,6 +255,10 @@ status_t settings_file_rewrite_filtered(
   return status;
 }
 
+void settings_file_set_change_callback(SettingsFileChangeCallback callback) {
+  s_change_callback = callback;
+}
+
 T_STATIC status_t settings_file_compact(SettingsFile *file) {
   return settings_file_rewrite_filtered(file, NULL, NULL);
 }
@@ -470,6 +477,11 @@ status_t settings_file_set(SettingsFile *file, const void *key, size_t key_len,
     file->used_space -= record_size(&file->iter.hdr);
   }
 
+  // Notify change callback if registered (for settings sync)
+  if (s_change_callback) {
+    s_change_callback(file, key, key_len, new_hdr.last_modified);
+  }
+
   return S_SUCCESS;
 }
 
@@ -489,6 +501,27 @@ status_t settings_file_mark_synced(SettingsFile *file, const void *key, size_t k
   }
 
   return E_DOES_NOT_EXIST;
+}
+
+static void prv_mark_all_dirty_rewrite_cb(SettingsFile *old_file, SettingsFile *new_file,
+                                          SettingsRecordInfo *info, void *context) {
+  // Read key and value from old file
+  uint8_t key[SETTINGS_KEY_MAX_LEN];
+  info->get_key(old_file, key, info->key_len);
+
+  uint8_t *val = kernel_malloc(info->val_len);
+  if (!val) {
+    return; // Skip this record on OOM
+  }
+  info->get_val(old_file, val, info->val_len);
+
+  // Write to new file - new records are dirty by default (no SYNCED flag)
+  settings_file_set(new_file, key, info->key_len, val, info->val_len);
+  kernel_free(val);
+}
+
+status_t settings_file_mark_all_dirty(SettingsFile *file) {
+  return settings_file_rewrite(file, prv_mark_all_dirty_rewrite_cb, NULL);
 }
 
 status_t settings_file_delete(SettingsFile *file,

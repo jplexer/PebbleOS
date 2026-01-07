@@ -4,6 +4,7 @@
 #include "quick_launch.h"
 #include "shell/normal/quick_launch.h"
 #include "shell/normal/watchface.h"
+#include "shell/normal/prefs_sync.h"
 #include "shell/prefs.h"
 #include "shell/prefs_private.h"
 #include "shell/system_theme.h"
@@ -701,6 +702,9 @@ void shell_prefs_init(void) {
   
   // Update the ambient light driver with the loaded threshold value
   ambient_light_set_dark_threshold(s_backlight_ambient_threshold);
+  
+  // Initialize prefs sync (must be after prefs are loaded)
+  prefs_sync_init();
 
   // Update accelerometer sensitivity with the loaded value
 #if CAPABILITY_HAS_ACCEL_SENSITIVITY
