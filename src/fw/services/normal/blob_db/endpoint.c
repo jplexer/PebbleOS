@@ -3,6 +3,7 @@
 
 #include "sync.h"
 #include "endpoint_private.h"
+#include "settings_blob_db.h"
 
 #include "services/common/bluetooth/bluetooth_persistent_storage.h"
 #include "services/common/comm_session/session.h"
@@ -53,6 +54,13 @@
 //! Response:
 //! \code{.c}
 //! 0x8B <uint16_t token> <uint8_t result> <uint8_t version>
+//! \endcode
+//!
+//! <b>DIRTY_ALL:</b> Mark all entries in a database as dirty (for full sync).
+//! Currently only supported for BlobDBIdSettings (0x0C).
+//!
+//! \code{.c}
+//! 0x0C <uint16_t token> <uint8_t DatabaseId>
 //! \endcode
 
 //! BlobDB Endpoint ID
@@ -261,6 +269,31 @@ static void prv_handle_version(CommSession *session, const uint8_t *data, uint32
                          COMM_SESSION_DEFAULT_TIMEOUT);
 }
 
+
+static void prv_handle_dirty_all(CommSession *session, const uint8_t *data, uint32_t length) {
+  // Message format: [token (2 bytes)] [db_id (1 byte)]
+  static const uint8_t MIN_DIRTY_ALL_LENGTH = sizeof(BlobDBToken) + sizeof(BlobDBId);
+  if (length < MIN_DIRTY_ALL_LENGTH) {
+    prv_send_response(session, prv_try_read_token(data, length), BLOB_DB_INVALID_DATA);
+    return;
+  }
+
+  BlobDBToken token;
+  BlobDBId db_id;
+  endpoint_private_read_token_db_id(data, &token, &db_id);
+
+  // Currently only Settings BlobDB supports mark_all_dirty
+  if (db_id != BlobDBIdSettings) {
+    prv_send_response(session, token, BLOB_DB_DB_NOT_SUPPORTED);
+    return;
+  }
+
+  status_t ret = settings_blob_db_mark_all_dirty();
+  BlobDBResponse result = (ret == S_SUCCESS) ? BLOB_DB_SUCCESS : BLOB_DB_GENERAL_FAILURE;
+  prv_send_response(session, token, result);
+}
+
+
 static void prv_blob_db_msg_decode_and_handle(
     CommSession *session, BlobDBCommand cmd, const uint8_t *data, size_t data_length) {
   switch (cmd) {
@@ -279,6 +312,10 @@ static void prv_blob_db_msg_decode_and_handle(
     case BLOB_DB_COMMAND_VERSION:
       PBL_LOG(LOG_LEVEL_DEBUG, "Got VERSION");
       prv_handle_version(session, data, data_length);
+      break;
+    case BLOB_DB_COMMAND_DIRTY_ALL:
+      PBL_LOG(LOG_LEVEL_DEBUG, "Got DIRTY_ALL");
+      prv_handle_dirty_all(session, data, data_length);
       break;
     // Commands not implemented.
     case BLOB_DB_COMMAND_READ:
