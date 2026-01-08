@@ -21,6 +21,8 @@
 #include "services/normal/settings/settings_file.h"
 #include "shell/prefs_private.h"
 #include "system/logging.h"
+#include "system/passert.h"
+#include "kernel/util/system_task.h"
 #include "util/list.h"
 #include "util/size.h"
 
@@ -116,7 +118,24 @@ static bool prv_is_syncable(const uint8_t *key, int key_len) {
   return false;
 }
 
-//! Callback for settings changes - triggers immediate sync to phone
+//! Deferred sync info - stored in event data
+typedef struct {
+  int key_len;
+  time_t last_modified;
+  char key[];
+} DeferredSyncInfo;
+
+//! Kernel background callback to perform the actual sync
+static void prv_deferred_sync_callback(void *data) {
+  DeferredSyncInfo *info = data;
+  blob_db_sync_record(BlobDBIdSettings, info->key, info->key_len, info->last_modified);
+  kernel_free(info);
+}
+
+//! Callback for settings changes - defers sync to avoid re-entrancy
+//! The callback is invoked while the settings file is still open, so we can't
+//! immediately sync (which would try to open the file again). Instead, we defer
+//! the sync to run after the file operations complete.
 static void prv_settings_change_callback(SettingsFile *file, const void *key, int key_len,
                                          time_t last_modified) {
   // Only sync whitelisted settings
@@ -124,8 +143,14 @@ static void prv_settings_change_callback(SettingsFile *file, const void *key, in
     return;
   }
 
-  // Trigger immediate sync of this record
-  blob_db_sync_record(BlobDBIdSettings, key, key_len, last_modified);
+  // Allocate and populate deferred sync info
+  DeferredSyncInfo *info = kernel_malloc_check(sizeof(DeferredSyncInfo) + key_len);
+  info->key_len = key_len;
+  info->last_modified = last_modified;
+  memcpy(info->key, key, key_len);
+
+  // Defer the sync to run after the settings file is closed
+  system_task_add_callback(prv_deferred_sync_callback, info);
 }
 
 // BlobDB Interface Implementation
