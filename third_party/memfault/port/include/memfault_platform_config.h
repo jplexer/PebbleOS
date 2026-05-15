@@ -37,3 +37,7 @@
 #define MEMFAULT_DATA_EXPORT_CHUNK_MAX_LEN 50
 
 #define MEMFAULT_REBOOT_REASON_CUSTOM_ENABLE 1
+
+// Custom Data Recordings — used by display_jdi_diagnostics to publish LCDC
+// register/state snapshots when the silent-loss watchdog fires.
+#define MEMFAULT_CDR_ENABLE 1

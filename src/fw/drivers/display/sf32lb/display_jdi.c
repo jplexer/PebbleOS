@@ -2,6 +2,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 #include "display_jdi.h"
+#include "display_jdi_diagnostics.h"
 
 #include "board/board.h"
 #include "board/display.h"
@@ -13,6 +14,7 @@
 #include "kernel/util/stop.h"
 #include "mcu/cache.h"
 #include "os/mutex.h"
+#include "pbl/services/analytics/analytics.h"
 #include "pbl/services/new_timer/new_timer.h"
 #include "system/logging.h"
 #include "system/passert.h"
@@ -219,6 +221,14 @@ static void prv_display_update_watchdog(void *data) {
 
   DisplayJDIState *state = DISPLAY->state;
   s_watchdog_fires++;
+
+  // Snapshot LCDC + driver state BEFORE the recovery mutates anything. The
+  // CDR rides the next Memfault sync; the heartbeat counter gives us fleet
+  // prevalence even without anyone digging into the CDR.
+  display_jdi_diagnostics_capture(&state->hlcdc, LcdcCaptureReason_WatchdogFired,
+                                  s_update_y0, s_update_y1, s_watchdog_fires);
+  PBL_ANALYTICS_ADD(lcdc_silent_loss_count, 1);
+
   PBL_LOG_ERR(
       "display_jdi: update timed out after %ums (ErrorCode=0x%lx, y=%u..%u, fires=%lu)",
       (unsigned)DISPLAY_UPDATE_TIMEOUT_MS, (unsigned long)state->hlcdc.ErrorCode,
@@ -391,6 +401,9 @@ void display_update(NextRowCallback nrcb, UpdateCompleteCallback uccb) {
   // until well after new_timer_service_init() has run.
   if (s_watchdog_timer == TIMER_INVALID_ID) {
     s_watchdog_timer = new_timer_create();
+    // Same boot-ordering reason: Memfault and the mutex subsystem aren't up
+    // when display_init runs. Register the CDR source here instead.
+    display_jdi_diagnostics_init();
   }
 
   s_uccb = uccb;
