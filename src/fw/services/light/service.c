@@ -306,20 +306,28 @@ static bool prv_light_allowed(void) {
   if (!s_backlight_allowed) {
     return false;
   }
-  
-  if (backlight_is_enabled()) {
-    if (backlight_is_ambient_sensor_enabled()) {
-      // If the light is off and it's bright outside, don't allow the light to turn on
-      // (we don't need it!). Grab the mutex here so that the timer state machine doesn't change
-      // the light brightness while we're checking the ambient light levels.
-      bool allowed = !((s_current_brightness == 0) && prv_als_is_light());
-      return allowed;
-    } else {
-      return true;
-    }
-  } else {
+
+  if (!backlight_is_enabled()) {
     return false;
   }
+
+  if (!backlight_is_ambient_sensor_enabled()) {
+    return true;
+  }
+
+  // Ambient-sensor preference is on, but a flaky ALS (W1160 timeouts seen
+  // on some Pebble Time 2 units) can latch into reporting "bright" and
+  // permanently gate the backlight. Fall back to allowing the wake when
+  // the driver reports the sensor is unhealthy — same effect as the user
+  // toggling the ambient-sensor pref off, but only while the sensor is bad.
+  if (!ambient_light_is_healthy()) {
+    return true;
+  }
+
+  // If the light is off and it's bright outside, don't allow the light to turn on
+  // (we don't need it!). Grab the mutex here so that the timer state machine doesn't change
+  // the light brightness while we're checking the ambient light levels.
+  return !((s_current_brightness == 0) && prv_als_is_light());
 }
 
 void light_init(void) {
