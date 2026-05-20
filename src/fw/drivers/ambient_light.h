@@ -40,6 +40,12 @@ void ambient_light_set_dark_threshold(uint32_t new_threshold);
 //! figure out whether it is light outside
 bool ambient_light_is_light();
 
+//! @return false if the sensor has recently failed (timeout / I2C error) and
+//! its readings should not be trusted. Callers that gate behavior on ambient
+//! light (e.g. the backlight service) should fall open when this returns
+//! false so a flaky sensor can't permanently block the user.
+bool ambient_light_is_healthy(void);
+
 //! Convert a light level obtained from ambient_light_get_light_level() into an
 //! AmbientLightLevel enum value.
 //! @param[in] light_level the raw light level reading obtained from ambient_light_get_light_level

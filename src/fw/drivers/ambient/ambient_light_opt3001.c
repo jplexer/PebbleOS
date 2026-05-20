@@ -113,6 +113,10 @@ bool ambient_light_is_light(void) {
   return s_initialized && ambient_light_get_light_level() > s_sensor_light_dark_threshold;
 }
 
+bool ambient_light_is_healthy(void) {
+  return s_initialized;
+}
+
 AmbientLightLevel ambient_light_level_to_enum(uint32_t light_level) {
   if (!s_initialized) {
     // if the sensor is not enabled, always return that it is very dark

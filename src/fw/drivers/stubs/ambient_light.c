@@ -26,6 +26,10 @@ bool ambient_light_is_light(void) {
   return false;
 }
 
+bool ambient_light_is_healthy(void) {
+  return true;
+}
+
 AmbientLightLevel ambient_light_level_to_enum(uint32_t light_level) {
   return AmbientLightLevelUnknown;
 }

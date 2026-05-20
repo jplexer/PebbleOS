@@ -6,6 +6,7 @@
 #include "drivers/ambient_light.h"
 #include "drivers/i2c.h"
 #include "drivers/periph_config.h"
+#include "drivers/rtc.h"
 #include "kernel/util/sleep.h"
 #include "mfg/mfg_info.h"
 #include "system/logging.h"
@@ -73,8 +74,20 @@
 #define W1160_ALS_POLL_DELAY_MS     (5)    /* ms between data-ready polls */
 #define W1160_ALS_POLL_TIMEOUT_MS   (200)  /* max wait for ALS data-ready */
 
+//! Once a read fails (I2C error or data-ready timeout), distrust the sensor
+//! for this long. Failure-prone parts on Pebble Time 2 alternate between
+//! timeouts and incorrect "bright" readings; without a grace period, callers
+//! would flap back to trusting the sensor as soon as a single read succeeded.
+#define W1160_HEALTH_GRACE_PERIOD_TICKS ((RtcTicks)5 * 60 * RTC_TICKS_HZ)
+
 static bool s_initialized;
 static uint32_t s_sensor_light_dark_threshold;
+//! Timestamp of the most recent failure (0 = no failure since boot).
+static RtcTicks s_last_failure_ticks;
+
+static void prv_mark_failure(void) {
+  s_last_failure_ticks = rtc_get_ticks();
+}
 
 static bool prv_read_register(uint8_t register_address, uint8_t *result) {
   i2c_use(I2C_W1160);
@@ -137,6 +150,7 @@ uint32_t ambient_light_get_light_level(void) {
   rv = prv_write_register(W1160_STATE_REG, W1160_SAMPLING_EN);
   if (!rv) {
     PBL_LOG_ERR("Could not enable W1160 sampling");
+    prv_mark_failure();
     return 0UL;
   }
 
@@ -167,6 +181,7 @@ uint32_t ambient_light_get_light_level(void) {
   rv = prv_write_register(W1160_STATE_REG, W1160_SAMPLING_DIS);
   if (!rv) {
     PBL_LOG_ERR("Could not disable W1160 sampling");
+    prv_mark_failure();
     return 0UL;
   }
 
@@ -175,6 +190,7 @@ uint32_t ambient_light_get_light_level(void) {
   return als;
 
 disable_and_fail:
+  prv_mark_failure();
   (void)prv_write_register(W1160_STATE_REG, W1160_SAMPLING_DIS);
   return 0UL;
 }
@@ -195,6 +211,18 @@ void ambient_light_set_dark_threshold(uint32_t new_threshold) {
 
 bool ambient_light_is_light(void) {
   return ambient_light_get_light_level() > s_sensor_light_dark_threshold;
+}
+
+bool ambient_light_is_healthy(void) {
+  if (!s_initialized) {
+    // Init never completed (e.g. chip ID mismatch). Treat as unhealthy so
+    // callers fall open rather than gating on a never-updated zero reading.
+    return false;
+  }
+  if (s_last_failure_ticks == 0) {
+    return true;
+  }
+  return (rtc_get_ticks() - s_last_failure_ticks) > W1160_HEALTH_GRACE_PERIOD_TICKS;
 }
 
 AmbientLightLevel ambient_light_level_to_enum(uint32_t light_level) {

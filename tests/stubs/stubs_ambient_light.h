@@ -18,3 +18,6 @@ void ambient_light_set_dark_threshold(uint32_t new_threshold) {
 bool ambient_light_is_light(void) {
 	return false;
 }
+bool ambient_light_is_healthy(void) {
+	return true;
+}
