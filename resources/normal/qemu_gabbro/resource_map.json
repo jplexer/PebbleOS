@@ -97,6 +97,26 @@
     },
     {
       "type": "png",
+      "name": "BEZEL_20MM_BLACK",
+      "file": "normal/getafix/images/bezel_20mm_black.png"
+    },
+    {
+      "type": "png",
+      "name": "BEZEL_20MM_SILVER",
+      "file": "normal/getafix/images/bezel_20mm_black.png"
+    },
+    {
+      "type": "png",
+      "name": "BEZEL_14MM_SILVER",
+      "file": "normal/getafix/images/bezel_20mm_black.png"
+    },
+    {
+      "type": "png",
+      "name": "BEZEL_14MM_ROSE_GOLD",
+      "file": "normal/getafix/images/bezel_20mm_black.png"
+    },
+    {
+      "type": "png",
       "name": "MULTIWATCH_TIMEZONE_20MM_BLACK",
       "file": "normal/getafix/images/multiwatch_tz_20mm_black.png"
     },

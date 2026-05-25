@@ -21,6 +21,7 @@
 #include "process_management/app_install_manager.h"
 #include "process_management/process_manager.h"
 #include "pbl/services/accel_manager.h"
+#include "pbl/services/compositor/compositor.h"
 #include "pbl/services/touch/touch.h"
 #include "pbl/services/touch/touch_nav_service.h"
 #include "pbl/services/hrm/hrm_manager.h"
@@ -2099,6 +2100,7 @@ LegacyAppRenderMode shell_prefs_get_legacy_app_render_mode(void) {
 void shell_prefs_set_legacy_app_render_mode(LegacyAppRenderMode mode) {
   uint8_t mode_value = (uint8_t)mode;
   prv_pref_set(PREF_KEY_LEGACY_APP_RENDER_MODE, &mode_value, sizeof(mode_value));
+  compositor_invalidate_bezel();
 }
 #endif
 

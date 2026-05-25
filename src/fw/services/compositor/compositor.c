@@ -29,6 +29,13 @@
 
 PBL_LOG_MODULE_DEFINE(service_compositor, CONFIG_SERVICE_COMPOSITOR_LOG_LEVEL);
 
+#if defined(CONFIG_APP_SCALING) && !defined(RECOVERY_FW) && defined(CONFIG_BOARD_FAMILY_GETAFIX)
+#define COMPOSITOR_HAS_BEZEL_IMAGE 1
+#include "applib/app_watch_info.h"
+#include "mfg/mfg_info.h"
+#include "resource/resource_ids.auto.h"
+#endif
+
 // The number of pixels for a given row which get set to black to round the corner. These numbers
 // are for the top-left corner, but can easily be translated to the other corners. This is used by
 
@@ -80,6 +87,11 @@ static DeferredRender s_deferred_render;
 static CompositorTransitionState s_animation_state;
 
 static bool s_framebuffer_frozen;
+
+#ifdef COMPOSITOR_HAS_BEZEL_IMAGE
+static GBitmap *s_bezel_bitmap;
+static WatchInfoColor s_bezel_loaded_color = WATCH_INFO_COLOR_UNKNOWN;
+#endif
 
 //! Animation .update function for the AnimationImplementation we use to drive our transitions.
 //! Wraps the .update function of the current CompositorTransition.
@@ -532,6 +544,49 @@ static TimelinePeekUnsupportedFaceMode prv_get_unsupported_face_mode_for_timelin
 }
 #endif
 
+#ifdef COMPOSITOR_HAS_BEZEL_IMAGE
+static uint32_t prv_bezel_resource_id_for_color(WatchInfoColor color) {
+  switch (color) {
+    case WATCH_INFO_COLOR_COREDEVICES_PR2_BLACK_20:
+      return RESOURCE_ID_BEZEL_20MM_BLACK;
+    case WATCH_INFO_COLOR_COREDEVICES_PR2_SILVER_20:
+      return RESOURCE_ID_BEZEL_20MM_SILVER;
+    case WATCH_INFO_COLOR_COREDEVICES_PR2_SILVER_14:
+      return RESOURCE_ID_BEZEL_14MM_SILVER;
+    case WATCH_INFO_COLOR_COREDEVICES_PR2_GOLD_14:
+      return RESOURCE_ID_BEZEL_14MM_ROSE_GOLD;
+    default:
+      return RESOURCE_ID_BEZEL_20MM_BLACK;
+  }
+}
+
+static GBitmap *prv_get_bezel_bitmap(void) {
+  const WatchInfoColor color = mfg_info_get_watch_color();
+  if (s_bezel_bitmap && s_bezel_loaded_color == color) {
+    return s_bezel_bitmap;
+  }
+  if (s_bezel_bitmap) {
+    gbitmap_destroy(s_bezel_bitmap);
+    s_bezel_bitmap = NULL;
+  }
+  s_bezel_bitmap =
+      gbitmap_create_with_resource_system(SYSTEM_APP, prv_bezel_resource_id_for_color(color));
+  s_bezel_loaded_color = color;
+  return s_bezel_bitmap;
+}
+
+#endif
+
+void compositor_invalidate_bezel(void) {
+#ifdef COMPOSITOR_HAS_BEZEL_IMAGE
+  if (s_bezel_bitmap) {
+    gbitmap_destroy(s_bezel_bitmap);
+    s_bezel_bitmap = NULL;
+  }
+  s_bezel_loaded_color = WATCH_INFO_COLOR_UNKNOWN;
+#endif
+}
+
 void compositor_scaled_app_fb_copy(const GRect update_rect, bool copy_relative_to_origin) {
   compositor_scaled_app_fb_copy_offset(update_rect, copy_relative_to_origin, 0 /* offset_y */);
 }
@@ -744,21 +799,34 @@ void compositor_scaled_app_fb_copy_offset(const GRect update_rect, bool copy_rel
   } else
 #endif
   {
-    // Original bezel mode - center with black bezel
+    // Bezel mode - center the app and fill the surround.
     const int16_t bezel_width = (DISP_COLS - app_width) / 2;
     const int16_t bezel_height = (DISP_ROWS - app_height) / 2;
     const int16_t app_peek_offset_y = timeline_peek_get_origin_y() - app_height;
     const int16_t app_offset_y = CLIP(app_peek_offset_y, 0, bezel_height);
     PBL_ASSERTN((bezel_width > 0) && (bezel_height > 0));
 
-    // memset the entire region to be updated to black
-    int16_t first_row = CLIP(update_rect.origin.y, 0, DISP_ROWS - 1);
-    int16_t last_row = CLIP(update_rect.origin.y + update_rect.size.h, first_row, DISP_ROWS);
-    for (int16_t y = first_row; y < last_row; y++) {
-      GBitmapDataRowInfo dst_row_info = gbitmap_get_data_row_info(&dst_bitmap, y);
-      const int16_t start_x = MAX(update_rect.origin.x, dst_row_info.min_x);
-      const int16_t end_x = MIN(update_rect.origin.x + update_rect.size.w, dst_row_info.max_x + 1);
-      memset(&dst_row_info.data[start_x], GColorBlack.argb, end_x - start_x);
+    GBitmap *bezel_image = NULL;
+#ifdef COMPOSITOR_HAS_BEZEL_IMAGE
+    bezel_image = prv_get_bezel_bitmap();
+#endif
+
+    if (bezel_image) {
+      GBitmap sub_bezel;
+      gbitmap_init_as_sub_bitmap(&sub_bezel, bezel_image, update_rect);
+      bitblt_bitmap_into_bitmap(&dst_bitmap, &sub_bezel, update_rect.origin,
+                                GCompOpAssign, GColorWhite);
+    } else {
+      // Fill the update region with solid black.
+      int16_t first_row = CLIP(update_rect.origin.y, 0, DISP_ROWS - 1);
+      int16_t last_row = CLIP(update_rect.origin.y + update_rect.size.h, first_row, DISP_ROWS);
+      for (int16_t y = first_row; y < last_row; y++) {
+        GBitmapDataRowInfo dst_row_info = gbitmap_get_data_row_info(&dst_bitmap, y);
+        const int16_t start_x = MAX(update_rect.origin.x, dst_row_info.min_x);
+        const int16_t end_x = MIN(update_rect.origin.x + update_rect.size.w,
+                                  dst_row_info.max_x + 1);
+        memset(&dst_row_info.data[start_x], GColorBlack.argb, end_x - start_x);
+      }
     }
 
     // bitblt the region of the app framebuffer into the display framebuffer

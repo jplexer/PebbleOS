@@ -132,3 +132,7 @@ void compositor_scaled_app_fb_copy(const GRect update_rect, bool copy_relative_t
 
 //! Extended version of compositor_scaled_app_fb_copy which allows an Y offset for the source to be specified.
 void compositor_scaled_app_fb_copy_offset(const GRect update_rect, bool copy_relative_to_origin, int16_t offset_y);
+
+//! Drop any cached bezel bitmap so the next render reloads it.
+//! No-op on platforms without bezel-image support.
+void compositor_invalidate_bezel(void);

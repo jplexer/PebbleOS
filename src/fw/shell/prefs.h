@@ -237,7 +237,9 @@ void shell_prefs_set_settings_dbs_compacted_v1(bool done);
 #ifdef CONFIG_APP_SCALING
 // Legacy app rendering mode - whether to use bezel or scaling for legacy apps
 typedef enum LegacyAppRenderMode {
-  LegacyAppRenderMode_Bezel = 0,    // Center with black bezel (original behavior)
+  //! Center the legacy app. The surround is either solid black or a decorative
+  //! bezel image, depending on platform support.
+  LegacyAppRenderMode_Bezel = 0,
   LegacyAppRenderMode_ScalingNearest = 1,  // Scale to fill screen (nearest-neighbor)
   LegacyAppRenderMode_ScalingBilinear = 2,  // Scale to fill screen (bilinear)
   LegacyAppRenderModeCount
