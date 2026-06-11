@@ -266,6 +266,8 @@ static bool prv_lis2dw12_enable_fifo(uint8_t num_samples) {
   return true;
 }
 
+static void prv_lis2dw12_recover(void);
+
 static void prv_lis2dw12_int1_work_handler(void) {
   bool ret;
   uint8_t val;
@@ -280,7 +282,7 @@ static void prv_lis2dw12_int1_work_handler(void) {
 
     if ((val & LIS2DW12_FIFO_SAMPLES_FIFO_OVR) != 0U) {
       PBL_LOG_WRN("FIFO overrun detected, re-arming");
-      prv_lis2dw12_enable_fifo(LIS2DW12->state->num_samples);
+      prv_lis2dw12_recover();
       action_taken = true;
     } else if ((val & LIS2DW12_FIFO_SAMPLES_FIFO_FTH) != 0U) {
       uint8_t samples;
@@ -411,6 +413,59 @@ static bool prv_configure_int1(bool shake_detection_enabled, bool fifo_enabled) 
   return true;
 }
 
+static void prv_lis2dw12_drain_fifo(void) {
+  uint8_t val;
+  uint8_t samples;
+
+  if (!prv_lis2dw12_read(LIS2DW12_FIFO_SAMPLES, &val, 1)) {
+    PBL_LOG_ERR("Could not read FIFO_SAMPLES register");
+    return;
+  }
+
+  samples = MIN(LIS2DW12_FIFO_SAMPLES_DIFF_GET(val), LIS2DW12_FIFO_SIZE);
+  if (samples > 0U) {
+    prv_lis2dw12_read_samples(samples);
+  }
+}
+
+//! Salvage queued samples and re-assert the full dynamic sensor configuration
+//! (ODR, FIFO mode, INT routing), then clear latched function INT sources.
+static void prv_lis2dw12_recover(void) {
+  uint8_t val;
+
+  LIS2DW12->state->num_recoveries++;
+  PBL_LOG_WRN("Recovering accel stream (count %" PRIu32 ")",
+          LIS2DW12->state->num_recoveries);
+
+  // Quiesce INT routing first so a latched-high pad produces a fresh edge
+  if (!prv_configure_int1(false, false)) {
+    return;
+  }
+
+  prv_lis2dw12_drain_fifo();
+
+  if (!prv_configure_odr(LIS2DW12->state->sampling_interval_us,
+                         LIS2DW12->state->shake_detection_enabled)) {
+    PBL_LOG_ERR("Could not configure ODR");
+    return;
+  }
+
+  if (!prv_lis2dw12_enable_fifo(LIS2DW12->state->num_samples)) {
+    return;
+  }
+
+  if (!prv_configure_int1(LIS2DW12->state->shake_detection_enabled, true)) {
+    return;
+  }
+
+  if (!prv_lis2dw12_read(LIS2DW12_ALL_INT_SRC, &val, 1)) {
+    PBL_LOG_ERR("Could not read ALL_INT_SRC register");
+    return;
+  }
+
+  LIS2DW12->state->last_fifo_read_tick = rtc_get_ticks();
+}
+
 static void prv_int1_wdt_work_cb(void) {
   RtcTicks now_tick = rtc_get_ticks();
   RtcTicks ticks_since_last_read = now_tick - LIS2DW12->state->last_fifo_read_tick;
@@ -421,23 +476,8 @@ static void prv_int1_wdt_work_cb(void) {
   }
 
   if (ms_since_last_read >= LIS2DW12_STALL_MARGIN * LIS2DW12->state->int1_period_ms) {
-    bool ret;
-    uint8_t val;
-
     PBL_LOG_WRN("FIFO stream stalled for %" PRIu32 " ms", ms_since_last_read);
-
-    // Re-enable FIFO, and clear any event INT source
-    ret = prv_lis2dw12_enable_fifo(LIS2DW12->state->num_samples);
-    if (!ret) {
-      PBL_LOG_ERR("Failed to re-enable FIFO");
-      return;
-    }
-
-    ret = prv_lis2dw12_read(LIS2DW12_ALL_INT_SRC, &val, 1);
-    if (!ret) {
-      PBL_LOG_ERR("Could not read ALL_INT_SRC register");
-      return;
-    }
+    prv_lis2dw12_recover();
   }
 }
 
