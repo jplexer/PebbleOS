@@ -45,6 +45,10 @@
 // without a sample read (>1x to tolerate scheduling jitter)
 #define LIS2DW12_STALL_MARGIN 2U
 
+// Lower bound on the stall threshold so small FIFO batches (short threshold
+// periods) don't trip recovery on normal work-queue latency
+#define LIS2DW12_STALL_MIN_MS 1000U
+
 // Scale range when in 12-bit mode (low-power mode 1)
 #define LIS2DW12_S12_SCALE_RANGE (1U << (12U - 1U))
 
@@ -471,6 +475,11 @@ static uint32_t prv_ms_since_last_fifo_read(void) {
   return (ticks * 1000) / RTC_TICKS_HZ;
 }
 
+static uint32_t prv_stall_threshold_ms(void) {
+  return MAX(LIS2DW12_STALL_MARGIN * LIS2DW12->state->int1_period_ms,
+             LIS2DW12_STALL_MIN_MS);
+}
+
 //! Shared by the INT1 watchdog timer and the accel_peek staleness trigger.
 //! Re-validates staleness at execution time so it is safe against sampling
 //! stopping or healing between schedule and execution.
@@ -484,7 +493,7 @@ static void prv_stall_check_work_cb(void) {
   }
 
   ms_since_last_read = prv_ms_since_last_fifo_read();
-  if (ms_since_last_read < LIS2DW12_STALL_MARGIN * LIS2DW12->state->int1_period_ms) {
+  if (ms_since_last_read < prv_stall_threshold_ms()) {
     return;
   }
 
@@ -716,8 +725,7 @@ int accel_peek(AccelDriverSample *data) {
   if (LIS2DW12->state->num_samples > 0U) {
     // Self-heal: a stalled stream would otherwise freeze peek data forever
     if (!LIS2DW12->state->recovery_pending &&
-        (prv_ms_since_last_fifo_read() >=
-         LIS2DW12_STALL_MARGIN * LIS2DW12->state->int1_period_ms)) {
+        (prv_ms_since_last_fifo_read() >= prv_stall_threshold_ms())) {
       LIS2DW12->state->recovery_pending = true;
       accel_offload_work(prv_stall_check_work_cb);
     }
