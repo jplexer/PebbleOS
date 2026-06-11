@@ -466,23 +466,34 @@ static void prv_lis2dw12_recover(void) {
   LIS2DW12->state->last_fifo_read_tick = rtc_get_ticks();
 }
 
-static void prv_int1_wdt_work_cb(void) {
-  RtcTicks now_tick = rtc_get_ticks();
-  RtcTicks ticks_since_last_read = now_tick - LIS2DW12->state->last_fifo_read_tick;
-  uint32_t ms_since_last_read = (ticks_since_last_read * 1000) / RTC_TICKS_HZ;
+static uint32_t prv_ms_since_last_fifo_read(void) {
+  RtcTicks ticks = rtc_get_ticks() - LIS2DW12->state->last_fifo_read_tick;
+  return (ticks * 1000) / RTC_TICKS_HZ;
+}
+
+//! Shared by the INT1 watchdog timer and the accel_peek staleness trigger.
+//! Re-validates staleness at execution time so it is safe against sampling
+//! stopping or healing between schedule and execution.
+static void prv_stall_check_work_cb(void) {
+  uint32_t ms_since_last_read;
+
+  LIS2DW12->state->recovery_pending = false;
 
   if (LIS2DW12->state->num_samples == 0U) {
     return;
   }
 
-  if (ms_since_last_read >= LIS2DW12_STALL_MARGIN * LIS2DW12->state->int1_period_ms) {
-    PBL_LOG_WRN("FIFO stream stalled for %" PRIu32 " ms", ms_since_last_read);
-    prv_lis2dw12_recover();
+  ms_since_last_read = prv_ms_since_last_fifo_read();
+  if (ms_since_last_read < LIS2DW12_STALL_MARGIN * LIS2DW12->state->int1_period_ms) {
+    return;
   }
+
+  PBL_LOG_WRN("FIFO stream stalled for %" PRIu32 " ms", ms_since_last_read);
+  prv_lis2dw12_recover();
 }
 
 static void prv_int1_wdt_cb(void *data) {
-  accel_offload_work(prv_int1_wdt_work_cb);
+  accel_offload_work(prv_stall_check_work_cb);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -645,6 +656,9 @@ void accel_set_num_samples(uint32_t num_samples) {
   // Disable all INT1 before changing FIFO threshold
   prv_configure_int1(false, false);
 
+  // Config change invalidates any queued stall check; re-arm the peek trigger
+  LIS2DW12->state->recovery_pending = false;
+
   if (num_samples == 0U) {
     // Bypass FIFO (disable)
     val = LIS2DW12_FIFO_CTRL_FIFO_MODE_BYPASS;
@@ -697,6 +711,14 @@ int accel_peek(AccelDriverSample *data) {
 
   // If sampling is active, return the last obtained sample
   if (LIS2DW12->state->num_samples > 0U) {
+    // Self-heal: a stalled stream would otherwise freeze peek data forever
+    if (!LIS2DW12->state->recovery_pending &&
+        (prv_ms_since_last_fifo_read() >=
+         LIS2DW12_STALL_MARGIN * LIS2DW12->state->int1_period_ms)) {
+      LIS2DW12->state->recovery_pending = true;
+      accel_offload_work(prv_stall_check_work_cb);
+    }
+
     if (!LIS2DW12->state->last_sample_valid) {
       return E_ERROR;
     }
