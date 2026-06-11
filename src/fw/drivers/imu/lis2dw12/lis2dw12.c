@@ -29,8 +29,10 @@
 // - For some reason (needs more investigation), INT1 is sometimes left HIGH
 //   due to FIFO overruns, and without edge change, we cannot detect such
 //   events. To mitigate this, there is a watchdog timer that re-arms FIFO
-//   if no INT1 event is detected within the expected time window based on the
-//   ODR and FIFO threshold.
+//   if no FIFO samples have been read within the expected time window based
+//   on the ODR and FIFO threshold. Sample reads (not INT1 edges) are tracked
+//   because shake/wake-up events share the INT1 pad and would otherwise mask
+//   a dead FIFO stream.
 
 // Time to wait after reset (us)
 #define LIS2DW12_RESET_TIME_US 5
@@ -38,6 +40,10 @@
 // DRDY polling parameters for accel_peek single-shot mode
 #define LIS2DW12_DRDY_POLL_DELAY_MS   (5)   /* ms between data-ready polls */
 #define LIS2DW12_DRDY_POLL_TIMEOUT_MS (100) /* max wait (~5x 20ms at 50Hz ODR) */
+
+// FIFO stream is considered stalled after this many FIFO threshold periods
+// without a sample read (>1x to tolerate scheduling jitter)
+#define LIS2DW12_STALL_MARGIN 2U
 
 // Scale range when in 12-bit mode (low-power mode 1)
 #define LIS2DW12_S12_SCALE_RANGE (1U << (12U - 1U))
@@ -234,6 +240,7 @@ static void prv_lis2dw12_read_samples(uint8_t num_samples) {
 
   LIS2DW12->state->last_sample = sample;
   LIS2DW12->state->last_sample_valid = true;
+  LIS2DW12->state->last_fifo_read_tick = rtc_get_ticks();
 }
 
 static bool prv_lis2dw12_enable_fifo(uint8_t num_samples) {
@@ -308,7 +315,6 @@ static void prv_lis2dw12_int1_work_handler(void) {
 }
 
 static void prv_lis2dw12_int1_irq_handler(bool *should_context_switch) {
-  LIS2DW12->state->last_int1_tick = rtc_get_ticks();
   accel_offload_work_from_isr(prv_lis2dw12_int1_work_handler, should_context_switch);
 }
 
@@ -407,14 +413,18 @@ static bool prv_configure_int1(bool shake_detection_enabled, bool fifo_enabled) 
 
 static void prv_int1_wdt_work_cb(void) {
   RtcTicks now_tick = rtc_get_ticks();
-  RtcTicks ticks_since_last_int1 = now_tick - LIS2DW12->state->last_int1_tick;
-  uint32_t ms_since_last_int1 = (ticks_since_last_int1 * 1000) / RTC_TICKS_HZ;
+  RtcTicks ticks_since_last_read = now_tick - LIS2DW12->state->last_fifo_read_tick;
+  uint32_t ms_since_last_read = (ticks_since_last_read * 1000) / RTC_TICKS_HZ;
 
-  if (ms_since_last_int1 >= LIS2DW12->state->int1_period_ms) {
+  if (LIS2DW12->state->num_samples == 0U) {
+    return;
+  }
+
+  if (ms_since_last_read >= LIS2DW12_STALL_MARGIN * LIS2DW12->state->int1_period_ms) {
     bool ret;
     uint8_t val;
 
-    PBL_LOG_WRN("INT1 not received in %" PRIu32 " ms", ms_since_last_int1);
+    PBL_LOG_WRN("FIFO stream stalled for %" PRIu32 " ms", ms_since_last_read);
 
     // Re-enable FIFO, and clear any event INT source
     ret = prv_lis2dw12_enable_fifo(LIS2DW12->state->num_samples);
@@ -614,7 +624,7 @@ void accel_set_num_samples(uint32_t num_samples) {
     }
 
     LIS2DW12->state->last_sample_valid = false;
-    LIS2DW12->state->last_int1_tick = rtc_get_ticks();
+    LIS2DW12->state->last_fifo_read_tick = rtc_get_ticks();
     LIS2DW12->state->int1_period_ms = (LIS2DW12->state->sampling_interval_us * num_samples) / 1000;
     regular_timer_add_multisecond_callback(&LIS2DW12->state->int1_wdt_timer,
                                            DIVIDE_CEIL(LIS2DW12->state->int1_period_ms, 1000UL));
