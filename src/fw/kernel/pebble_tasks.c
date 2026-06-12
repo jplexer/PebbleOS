@@ -5,6 +5,7 @@
 
 #include "kernel/memory_layout.h"
 #include "kernel/pbl_malloc.h"
+#include "kernel/scratch_stack.h"
 
 #include "process_management/app_manager.h"
 #include "process_management/worker_manager.h"
@@ -141,6 +142,7 @@ void pbl_analytics_external_collect_stack_free(void) {
   PBL_ANALYTICS_SET_UNSIGNED(stack_free_newtimers_bytes, prv_task_get_stack_free(PebbleTask_NewTimers));
   PBL_ANALYTICS_SET_UNSIGNED(stack_free_app_syscall_bytes, syscall_app_stack_free_bytes());
   PBL_ANALYTICS_SET_UNSIGNED(stack_free_worker_syscall_bytes, syscall_worker_stack_free_bytes());
+  PBL_ANALYTICS_SET_UNSIGNED(stack_free_scratch_bytes, scratch_stack_free_bytes());
 }
 
 static const enum pbl_analytics_key s_task_cpu_pct_keys[NumPebbleTask] = {
