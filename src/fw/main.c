@@ -52,6 +52,7 @@
 #include "kernel/fault_handling.h"
 #include "kernel/memory_layout.h"
 #include "kernel/panic.h"
+#include "kernel/scratch_stack.h"
 #include "kernel/pulse_logging.h"
 #include "pbl/services/services.h"
 #include "pbl/services/boot_splash.h"
@@ -322,6 +323,8 @@ static NOINLINE void prv_main_task_init(void) {
   system_task_init();
 
   events_init();
+
+  scratch_stack_init();
 
   new_timer_service_init();
   regular_timer_init();

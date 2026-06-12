@@ -175,6 +175,15 @@ SECTIONS {
     } >REGION_KERNEL_STACKS
     __kernel_bg_stack_size__ = . - __kernel_bg_stack_start__;
 
+    /* Shared borrowed stack (see kernel/scratch_stack.c). Must stay above the
+     * kernel task stacks: the FreeRTOS switch-out check requires a borrowing
+     * task's saved SP to be numerically above its own stack base. */
+    .scratch_stack (NOLOAD) : {
+        . = ALIGN(8);
+        *(.scratch_stack)
+        *(.scratch_stack.*)
+    } >REGION_KERNEL_STACKS
+
     .kernel_heap (NOLOAD) : {
         _heap_start = .;
         . = ORIGIN(REGION_KERNEL_HEAP) + LENGTH(REGION_KERNEL_HEAP);
