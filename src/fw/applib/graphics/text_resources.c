@@ -8,6 +8,7 @@
 
 #include "applib/fonts/fonts.h"
 #include "applib/fonts/fonts_private.h"
+#include "kernel/scratch_stack.h"
 #include "resource/resource_ids.auto.h"
 #include "system/logging.h"
 #include "system/passert.h"
@@ -349,6 +350,102 @@ static bool prv_load_glyph_bitmap(Codepoint codepoint, const FontResource *font_
   return true;
 }
 
+typedef struct {
+  Codepoint codepoint;
+  FontCache *font_cache;
+  const FontResource *font_res;
+  bool need_bitmap;
+  uint32_t cache_key;
+  LineCacheData *cached;
+  const GlyphData *result;
+} GlyphSpiLoad;
+
+//! Runs on the scratch stack: the bitmap load below hits flash (resource ->
+//! pfs -> flash), which is too deep for the small task stacks.
+static void prv_load_cached_bitmap_cb(void *context) {
+  GlyphSpiLoad *load = context;
+  if (prv_load_glyph_bitmap(load->codepoint, load->font_res, load->cached)) {
+    load->result = &load->cached->glyph_data;
+  }
+}
+
+//! Runs on the scratch stack: cache-miss path, offset/metadata/bitmap all
+//! load from flash.
+static void prv_load_glyph_cb(void *context) {
+  GlyphSpiLoad *load = context;
+  const Codepoint codepoint = load->codepoint;
+  FontCache *font_cache = load->font_cache;
+  const FontResource *font_res = load->font_res;
+  const uint32_t cache_key = load->cache_key;
+
+  LineCacheData *data = &font_cache->cache_data_scratch;
+  data->is_bitmap_loaded = false;
+  data->resource_offset = prv_get_glyph_data_offset(codepoint, font_cache, font_res);
+  GlyphData *g = &data->glyph_data;
+
+  if (data->resource_offset == 0) {
+    PBL_LOG_D_DBG(LOG_DOMAIN_TEXT, "offset for cp: %"PRIx32" is NULL", codepoint);
+    // Put the missing character into our cache so we don't waste time looking for it again
+    keyed_circular_cache_push(&font_cache->line_cache, cache_key, data);
+    return;
+  }
+
+  size_t num_bytes_loaded;
+  if (FONT_VERSION(font_res->md.version) == FONT_VERSION_1) {
+    GlyphHeaderDataV1 header;
+    PBL_LOG_D_DBG(LOG_DOMAIN_TEXT, "LGMD READ: offset: %"PRIx32", bytes: %zu",
+              data->resource_offset, sizeof(header));
+    SYS_PROFILER_NODE_START(text_render_flash);
+    num_bytes_loaded = sys_resource_load_range(font_res->app_num, font_res->resource_id,
+                                               data->resource_offset, (uint8_t *)&header,
+                                               sizeof(header));
+    SYS_PROFILER_NODE_STOP(text_render_flash);
+
+    // convert to a GlyphHeaderData struct
+    memcpy(&g->header, &header, sizeof(GlyphHeaderData));
+    g->header.horiz_advance = header.horiz_advance;
+  } else {
+    PBL_LOG_D_DBG(LOG_DOMAIN_TEXT, "GMD read: cp: %"PRIx32", offset: %"PRId32", bytes: %zu", codepoint,
+              data->resource_offset, sizeof(GlyphHeaderData));
+    SYS_PROFILER_NODE_START(text_render_flash);
+    num_bytes_loaded = sys_resource_load_range(font_res->app_num, font_res->resource_id,
+                                               data->resource_offset, (uint8_t *)&g->header,
+                                               sizeof(GlyphHeaderData));
+    SYS_PROFILER_NODE_STOP(text_render_flash);
+  }
+
+  if (!num_bytes_loaded) {
+    PBL_LOG_WRN("Failed to load glyph metadata from resources; cp: %"PRIx32", offset: %"PRIx32,
+            codepoint, data->resource_offset);
+    return;
+  }
+
+  // Copy the info into the glyph_buffer.
+  // This must be done _before_ loading the bitmap, otherwise loading the bitmap may modify the
+  // metadata! We will use `glyph_buffer` as the final data, and leave `data` as the uncooked
+  // version, that way we can push `data` into the circular cache.
+  memcpy(font_cache->glyph_buffer, data, sizeof(LineCacheData));
+  font_cache->glyph_buffer_key = cache_key;
+
+  LineCacheData *final_data = (LineCacheData *)(font_cache->glyph_buffer);
+
+  if (load->need_bitmap &&
+      !prv_load_glyph_bitmap(codepoint, font_res, final_data)) {
+    return;
+  }
+
+  // We push `data`, which will be cooked data if the bitmap is stored along with it, or
+  // the uncooked data if it's not. In reality, this only matters to compressed glyphs, since
+  // compressed glyphs are the only case where the metadata gets modified.
+  // The only time the data is cooked is when loading a bitmap and the glyph is compressed, in
+  // which case the `num_rle_units` field is turned back into `height_px`.
+  keyed_circular_cache_push(&font_cache->line_cache, cache_key, data);
+
+  // We return `final_data` though, because that has the actual metadata info that needs to be
+  // used.
+  load->result = &final_data->glyph_data;
+}
+
 static const GlyphData *prv_get_glyph_metadata_from_spi(Codepoint codepoint,
                                                         FontCache *font_cache,
                                                         const FontResource *font_res,
@@ -381,86 +478,30 @@ static const GlyphData *prv_get_glyph_metadata_from_spi(Codepoint codepoint,
     }
   }
 
+  GlyphSpiLoad load = {
+    .codepoint = codepoint,
+    .font_cache = font_cache,
+    .font_res = font_res,
+    .need_bitmap = need_bitmap,
+    .cache_key = cache_key,
+    .cached = cached,
+  };
+
   if (cached) {
     if (cached->resource_offset == 0) {
       // missing character
       return NULL;
     }
-    if (need_bitmap &&
-        !cached->is_bitmap_loaded &&
-        !prv_load_glyph_bitmap(codepoint, font_res, cached)) {
-      return NULL;
+    if (need_bitmap && !cached->is_bitmap_loaded) {
+      scratch_stack_call(prv_load_cached_bitmap_cb, &load);
+      return load.result;
     }
     return &cached->glyph_data;
   }
 
-  // We missed the cache, so we need to build a new cache entry.
-  LineCacheData *data = &font_cache->cache_data_scratch;
-  data->is_bitmap_loaded = false;
-  data->resource_offset = prv_get_glyph_data_offset(codepoint, font_cache, font_res);
-  GlyphData *g = &data->glyph_data;
-
-  if (data->resource_offset == 0) {
-    PBL_LOG_D_DBG(LOG_DOMAIN_TEXT, "offset for cp: %"PRIx32" is NULL", codepoint);
-    // Put the missing character into our cache so we don't waste time looking for it again
-    keyed_circular_cache_push(&font_cache->line_cache, cache_key, data);
-    return NULL;
-  }
-
-  size_t num_bytes_loaded;
-  if (FONT_VERSION(font_res->md.version) == FONT_VERSION_1) {
-    GlyphHeaderDataV1 header;
-    PBL_LOG_D_DBG(LOG_DOMAIN_TEXT, "LGMD READ: offset: %"PRIx32", bytes: %zu",
-              data->resource_offset, sizeof(header));
-    SYS_PROFILER_NODE_START(text_render_flash);
-    num_bytes_loaded = sys_resource_load_range(font_res->app_num, font_res->resource_id,
-                                               data->resource_offset, (uint8_t *)&header,
-                                               sizeof(header));
-    SYS_PROFILER_NODE_STOP(text_render_flash);
-
-    // convert to a GlyphHeaderData struct
-    memcpy(&g->header, &header, sizeof(GlyphHeaderData));
-    g->header.horiz_advance = header.horiz_advance;
-  } else {
-    PBL_LOG_D_DBG(LOG_DOMAIN_TEXT, "GMD read: cp: %"PRIx32", offset: %"PRId32", bytes: %zu", codepoint,
-              data->resource_offset, sizeof(GlyphHeaderData));
-    SYS_PROFILER_NODE_START(text_render_flash);
-    num_bytes_loaded = sys_resource_load_range(font_res->app_num, font_res->resource_id,
-                                               data->resource_offset, (uint8_t *)&g->header,
-                                               sizeof(GlyphHeaderData));
-    SYS_PROFILER_NODE_STOP(text_render_flash);
-  }
-
-  if (!num_bytes_loaded) {
-    PBL_LOG_WRN("Failed to load glyph metadata from resources; cp: %"PRIx32", offset: %"PRIx32,
-            codepoint, data->resource_offset);
-    return NULL;
-  }
-
-  // Copy the info into the glyph_buffer.
-  // This must be done _before_ loading the bitmap, otherwise loading the bitmap may modify the
-  // metadata! We will use `glyph_buffer` as the final data, and leave `data` as the uncooked
-  // version, that way we can push `data` into the circular cache.
-  memcpy(font_cache->glyph_buffer, data, sizeof(LineCacheData));
-  font_cache->glyph_buffer_key = cache_key;
-
-  LineCacheData *final_data = (LineCacheData *)(font_cache->glyph_buffer);
-
-  if (need_bitmap &&
-      !prv_load_glyph_bitmap(codepoint, font_res, final_data)) {
-    return NULL;
-  }
-
-  // We push `data`, which will be cooked data if the bitmap is stored along with it, or
-  // the uncooked data if it's not. In reality, this only matters to compressed glyphs, since
-  // compressed glyphs are the only case where the metadata gets modified.
-  // The only time the data is cooked is when loading a bitmap and the glyph is compressed, in
-  // which case the `num_rle_units` field is turned back into `height_px`.
-  keyed_circular_cache_push(&font_cache->line_cache, cache_key, data);
-
-  // We return `final_data` though, because that has the actual metadata info that needs to be
-  // used.
-  return &final_data->glyph_data;
+  // We missed the cache, so we need to build a new cache entry from flash.
+  scratch_stack_call(prv_load_glyph_cb, &load);
+  return load.result;
 }
 
 static void prv_check_font_cache(FontCache *font_cache, const FontResource *font_res) {
@@ -586,10 +627,16 @@ bool text_resources_init_font(ResAppNum app_num, uint32_t font_resource,
   return true;
 }
 
+//! Runs on the scratch stack: reloading a font reads resource manifests from
+//! flash.
+static void prv_font_reload_cb(void *context) {
+  sys_font_reload_font(context);
+}
+
 static const GlyphData *prv_get_glyph(FontCache *font_cache, Codepoint codepoint,
                                       FontInfo *font_info, bool need_bitmap) {
   if (!font_info->loaded) {
-    sys_font_reload_font(font_info);
+    scratch_stack_call(prv_font_reload_cb, font_info);
   }
 
   // if we cannot find the codepoint we are looking for, we should always be
