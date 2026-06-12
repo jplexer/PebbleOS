@@ -3,7 +3,7 @@
 
 bld.stlib(
     use=['fw_includes', 'services_analytics'],
-    source=['service.c'],
+    source=['console.c', 'service.c'],
     target='services_light',
 )
 bld.env.SERVICES.append('services_light')
