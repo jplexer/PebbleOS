@@ -53,6 +53,9 @@ extern void command_read_word(const char*);
 
 extern void command_backlight_ctl(const char*);
 extern void command_light_test(void);
+#if defined(CONFIG_ALS_SCREEN_COMPENSATION)
+extern void command_als_curve(void);
+#endif
 extern void command_backlight_set_color(const char*);
 
 extern void command_battery_charge_option(const char*);
@@ -342,6 +345,9 @@ static const Command s_prompt_commands[] = {
   { "temp read",  command_temperature_read, 0 },
   { "als read", command_als_read, 0},
   { "light test", command_light_test, 0},
+#if defined(CONFIG_ALS_SCREEN_COMPENSATION)
+  { "als curve", command_als_curve, 0},
+#endif
 #ifndef CONFIG_RELEASE
   { "litter pfs", command_litter_filesystem, 2 },
 #endif
