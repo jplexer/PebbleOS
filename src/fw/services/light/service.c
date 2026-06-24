@@ -15,6 +15,7 @@
 #include "pbl/services/analytics/analytics.h"
 #include "pbl/services/battery/battery_monitor.h"
 #include "pbl/services/new_timer/new_timer.h"
+#include "services/light/als_screen_compensation.h"
 #include "syscall/syscall_internal.h"
 #include "system/logging.h"
 #include "os/mutex.h"
@@ -171,7 +172,15 @@ static uint32_t prv_get_als_level(void) {
   if (cache_valid) {
     return s_als_cached_level;
   }
-  s_als_cached_level = ambient_light_get_light_level();
+  uint32_t level = ambient_light_get_light_level();
+#if defined(CONFIG_ALS_SCREEN_COMPENSATION) && !defined(CONFIG_RECOVERY_FW)
+  // The ALS sits under the display; correct the reading for the transmittance
+  // of the pixels in front of the sensor. Done once at ingest so every consumer
+  // sees a screen-corrected value, and the cache below throttles the
+  // framebuffer scan to at most once per TTL.
+  level = als_compensation_correct(level);
+#endif
+  s_als_cached_level = level;
   s_als_cached_ticks = now;
   return s_als_cached_level;
 }
