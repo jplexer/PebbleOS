@@ -107,11 +107,6 @@ DEFINE_SYSCALL(void, moddable_createMachine, ModdableCreationRecord *cr)
 		}
 	}
 
-	// FFI hands the app direct pointers into XS storage (string chunks, slot
-	// handles); keep the whole machine in app RAM so unprivileged dereferences
-	// don't MPU-fault.
-	modMachineAllowKernelHeap(NULL == fxBuildFFI);
-
 	xsMachine *the = modCloneMachine(&creation, NULL);
 	if (NULL == the) {
 		APP_LOG(APP_LOG_LEVEL_ERROR, "failed to allocate XS machine");
