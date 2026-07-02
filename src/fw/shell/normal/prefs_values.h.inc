@@ -16,7 +16,7 @@
   PREFS_MACRO(PREF_KEY_TOUCH_ENABLED, s_touch_enabled)
   PREFS_MACRO(PREF_KEY_MOTION_SENSITIVITY, s_motion_sensitivity)
 #ifdef CONFIG_DYNAMIC_BACKLIGHT
-  PREFS_MACRO(PREF_KEY_BACKLIGHT_DYNAMIC_INTENSITY, s_backlight_dynamic_intensity_enabled)
+  PREFS_MACRO(PREF_KEY_BACKLIGHT_DYNAMIC_MODE, s_backlight_dynamic_mode)
 #endif
   PREFS_MACRO(PREF_KEY_BACKLIGHT_AMBIENT_THRESHOLD, s_backlight_ambient_threshold)
   PREFS_MACRO(PREF_KEY_STATIONARY, s_stationary_mode_enabled)

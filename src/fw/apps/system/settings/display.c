@@ -220,6 +220,34 @@ static void prv_touch_wake_menu_push(SettingsBacklightData *data) {
 }
 #endif
 
+// Dynamic Backlight Settings
+/////////////////////////////
+#ifdef CONFIG_DYNAMIC_BACKLIGHT
+static const char *s_dynamic_mode_labels[BacklightDynamicModeCount] = {
+    [BacklightDynamicMode_Off] = i18n_ctx_noop("DynBacklight", "Off"),
+    [BacklightDynamicMode_Bright] = i18n_noop("Bright"),
+    [BacklightDynamicMode_Standard] = i18n_noop("Standard"),
+    [BacklightDynamicMode_Dim] = i18n_noop("Dim"),
+};
+
+static void prv_dynamic_mode_menu_select(OptionMenu *option_menu, int selection, void *context) {
+  light_set_dynamic_mode((BacklightDynamicMode)selection);
+  app_window_stack_remove(&option_menu->window, true /* animated */);
+}
+
+static void prv_dynamic_mode_menu_push(SettingsBacklightData *data) {
+  const int index = (int)backlight_get_dynamic_mode();
+  const OptionMenuCallbacks callbacks = {
+    .select = prv_dynamic_mode_menu_select,
+  };
+  const char *title = PBL_IF_RECT_ELSE(i18n_noop("DYNAMIC BACKLIGHT"),
+                                       i18n_noop("Dynamic Backlight"));
+  settings_option_menu_push(
+      title, OptionMenuContentType_SingleLine, index, &callbacks,
+      ARRAY_LENGTH(s_dynamic_mode_labels), true /* icons_enabled */, s_dynamic_mode_labels, data);
+}
+#endif
+
 // Legacy App Mode Settings (Obelix only)
 /////////////////////////////
 #ifdef CONFIG_APP_SCALING
@@ -312,7 +340,7 @@ static void prv_backlight_select_click_cb(SettingsCallbacks *context, uint16_t r
       break;
 #ifdef CONFIG_DYNAMIC_BACKLIGHT
     case SettingsBacklightDynamicIntensity:
-      light_toggle_dynamic_intensity_enabled();
+      prv_dynamic_mode_menu_push(data);
       break;
 #endif
     case SettingsBacklightIntensity:
@@ -377,7 +405,7 @@ static void prv_backlight_draw_row_cb(SettingsCallbacks *context, GContext *ctx,
 #ifdef CONFIG_DYNAMIC_BACKLIGHT
     case SettingsBacklightDynamicIntensity:
       title = i18n_noop("Dynamic Backlight");
-      subtitle = backlight_is_dynamic_intensity_enabled() ? i18n_noop("On") : i18n_noop("Off");
+      subtitle = s_dynamic_mode_labels[backlight_get_dynamic_mode()];
       break;
 #endif
     case SettingsBacklightIntensity:

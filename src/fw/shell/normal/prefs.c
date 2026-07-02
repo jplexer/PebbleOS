@@ -96,10 +96,12 @@ static bool s_touch_enabled = true;
 static uint8_t s_motion_sensitivity = 55; // Default to Medium
 
 #ifdef CONFIG_DYNAMIC_BACKLIGHT
-#define PREF_KEY_BACKLIGHT_DYNAMIC_INTENSITY "lightDynamicIntensity"
-static bool s_backlight_dynamic_intensity_enabled = true;
+#define PREF_KEY_BACKLIGHT_DYNAMIC_MODE "lightDynamicMode"
+static uint8_t s_backlight_dynamic_mode = BacklightDynamicMode_Standard;
 
-// Removed pref; the key define survives only so migration can scrub stored values.
+// Removed prefs; the key defines survive only so migration can convert/scrub
+// stored values.
+#define PREF_KEY_BACKLIGHT_DYNAMIC_INTENSITY_DEPRECATED "lightDynamicIntensity"
 #define PREF_KEY_DYNAMIC_BACKLIGHT_MIN_THRESHOLD "dynBacklightMinThreshold"
 #endif
 
@@ -393,8 +395,12 @@ static bool prv_set_s_touch_enabled(bool *enabled) {
 }
 
 #ifdef CONFIG_DYNAMIC_BACKLIGHT
-static bool prv_set_s_backlight_dynamic_intensity_enabled(bool *enabled) {
-  s_backlight_dynamic_intensity_enabled = *enabled;
+static bool prv_set_s_backlight_dynamic_mode(uint8_t *mode) {
+  if (*mode >= BacklightDynamicModeCount) {
+    s_backlight_dynamic_mode = BacklightDynamicMode_Standard;
+    return false;
+  }
+  s_backlight_dynamic_mode = *mode;
   return true;
 }
 #endif
@@ -837,6 +843,25 @@ static void prv_convert_deprecated_backlight_behaviour_key(SettingsFile *file) {
   }
 }
 
+#ifdef CONFIG_DYNAMIC_BACKLIGHT
+static void prv_convert_deprecated_dynamic_intensity_key(SettingsFile *file) {
+  // If present, convert the deprecated dynamic-intensity bool to the mode enum:
+  // enabled -> Standard, disabled -> Off.
+  if (settings_file_exists(file, PREF_KEY_BACKLIGHT_DYNAMIC_INTENSITY_DEPRECATED,
+                           sizeof(PREF_KEY_BACKLIGHT_DYNAMIC_INTENSITY_DEPRECATED))) {
+    bool enabled = true;
+    settings_file_get(file, PREF_KEY_BACKLIGHT_DYNAMIC_INTENSITY_DEPRECATED,
+                      sizeof(PREF_KEY_BACKLIGHT_DYNAMIC_INTENSITY_DEPRECATED),
+                      &enabled, sizeof(enabled));
+    const uint8_t mode = enabled ? BacklightDynamicMode_Standard : BacklightDynamicMode_Off;
+    settings_file_set(file, PREF_KEY_BACKLIGHT_DYNAMIC_MODE,
+                      sizeof(PREF_KEY_BACKLIGHT_DYNAMIC_MODE), &mode, sizeof(mode));
+    settings_file_delete(file, PREF_KEY_BACKLIGHT_DYNAMIC_INTENSITY_DEPRECATED,
+                         sizeof(PREF_KEY_BACKLIGHT_DYNAMIC_INTENSITY_DEPRECATED));
+  }
+}
+#endif
+
 
 // ------------------------------------------------------------------------------------
 static void prv_pref_set(const char* key, const void *value, size_t val_len);
@@ -863,6 +888,9 @@ void shell_prefs_init(void) {
   }
 
   prv_convert_deprecated_backlight_behaviour_key(&file);
+#ifdef CONFIG_DYNAMIC_BACKLIGHT
+  prv_convert_deprecated_dynamic_intensity_key(&file);
+#endif
 
   // Init state for each pref from our backing store
   uint32_t num_entries = ARRAY_LENGTH(s_prefs_table);
@@ -1241,12 +1269,20 @@ void touch_set_globally_enabled(bool enable) {
 }
 
 #ifdef CONFIG_DYNAMIC_BACKLIGHT
-bool backlight_is_dynamic_intensity_enabled(void) {
-  return s_backlight_dynamic_intensity_enabled;
+BacklightDynamicMode backlight_get_dynamic_mode(void) {
+  return (BacklightDynamicMode)s_backlight_dynamic_mode;
 }
 
-void backlight_set_dynamic_intensity_enabled(bool enable) {
-  prv_pref_set(PREF_KEY_BACKLIGHT_DYNAMIC_INTENSITY, &enable, sizeof(enable));
+void backlight_set_dynamic_mode(BacklightDynamicMode mode) {
+  if (mode >= BacklightDynamicModeCount) {
+    mode = BacklightDynamicMode_Standard;
+  }
+  const uint8_t value = (uint8_t)mode;
+  prv_pref_set(PREF_KEY_BACKLIGHT_DYNAMIC_MODE, &value, sizeof(value));
+}
+
+bool backlight_is_dynamic_intensity_enabled(void) {
+  return s_backlight_dynamic_mode != BacklightDynamicMode_Off;
 }
 #endif
 
