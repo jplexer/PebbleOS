@@ -70,7 +70,6 @@ PBL_LOG_MODULE_DEFINE(driver_ambient_w1160, CONFIG_DRIVER_AMBIENT_LOG_LEVEL);
 
 #define W1160_RESULT_EXPONENT_SHIFT (12)
 #define W1160_RESULT_MANTISSA_MASK  (0x0FFF)
-#define W1160_ADC2LUX_COEF          (3U)
 
 #define W1160_ALS_POLL_DELAY_MS     (5)    /* ms between data-ready polls */
 #define W1160_ALS_POLL_TIMEOUT_MS   (200)  /* max wait for ALS data-ready */
