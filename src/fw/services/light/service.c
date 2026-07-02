@@ -139,6 +139,10 @@ static TimerID s_als_prime_release_timer_id;
 static bool s_als_primed;
 #define ALS_PRIME_HOLDOFF_MS (5000)
 
+//! Ambient level at which the dynamic backlight ramp bottoms out at its dim
+//! intensity. Board-independent now that levels are in lux.
+#define DYNAMIC_BACKLIGHT_DIM_LUX (1)
+
 static void prv_change_state(BacklightState new_state);
 
 //! Timer callback: holdoff expired, drop the prime so the W1160 stops
@@ -211,7 +215,7 @@ static uint8_t prv_backlight_get_intensity(void) {
   }
   
 #if defined(CONFIG_DYNAMIC_BACKLIGHT) && !defined(CONFIG_RECOVERY_FW)
-  // Dynamic backlight: linear ramp from dim_intensity at dynamic_min_threshold
+  // Dynamic backlight: linear ramp from dim_intensity at DYNAMIC_BACKLIGHT_DIM_LUX
   // up to 100% at ambient_light_dark_threshold, then clamped to user_max. This
   // keeps the slope independent of the user's brightness preference, so a user
   // who caps their max at e.g. 60% still hits that cap partway up the ALS range
@@ -222,7 +226,7 @@ static uint8_t prv_backlight_get_intensity(void) {
     const uint8_t dim_intensity = 10;
     const uint8_t user_max = backlight_get_intensity();
     const uint32_t als = prv_get_als_level();
-    const uint32_t dim_threshold = backlight_get_dynamic_min_threshold();
+    const uint32_t dim_threshold = DYNAMIC_BACKLIGHT_DIM_LUX;
     const uint32_t max_threshold = ambient_light_get_dark_threshold();
 
     if (user_max <= dim_intensity || max_threshold <= dim_threshold) {

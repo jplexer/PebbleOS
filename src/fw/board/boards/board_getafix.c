@@ -495,7 +495,6 @@ const BoardConfig BOARD_CONFIG = {
   .ambient_light_lux_dark_offset = 0,
   .ambient_light_lux_num = 50,
   .ambient_light_lux_den = 517,
-  .dynamic_backlight_min_threshold = 5,
 };
 
 const BoardConfigButton BOARD_CONFIG_BUTTON = {
