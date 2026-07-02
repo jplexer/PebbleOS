@@ -66,7 +66,6 @@ static const char *s_syncable_settings[] = {
   "lightAmbientThreshold",
 #ifdef CONFIG_DYNAMIC_BACKLIGHT
   "lightDynamicIntensity",
-  "dynBacklightMinThreshold",
 #endif
 #ifdef CONFIG_BACKLIGHT_HAS_COLOR
   "lightColor",

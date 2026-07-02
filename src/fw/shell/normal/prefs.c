@@ -99,8 +99,8 @@ static uint8_t s_motion_sensitivity = 55; // Default to Medium
 #define PREF_KEY_BACKLIGHT_DYNAMIC_INTENSITY "lightDynamicIntensity"
 static bool s_backlight_dynamic_intensity_enabled = true;
 
+// Removed pref; the key define survives only so migration can scrub stored values.
 #define PREF_KEY_DYNAMIC_BACKLIGHT_MIN_THRESHOLD "dynBacklightMinThreshold"
-static uint32_t s_dynamic_backlight_min_threshold = 0; // default set from board config in shell_prefs_init()
 #endif
 
 #ifdef CONFIG_ORIENTATION_MANAGER
@@ -395,16 +395,6 @@ static bool prv_set_s_touch_enabled(bool *enabled) {
 #ifdef CONFIG_DYNAMIC_BACKLIGHT
 static bool prv_set_s_backlight_dynamic_intensity_enabled(bool *enabled) {
   s_backlight_dynamic_intensity_enabled = *enabled;
-  return true;
-}
-
-static bool prv_set_s_dynamic_backlight_min_threshold(uint32_t *threshold) {
-  // Validate and constrain the threshold
-  if (*threshold > AMBIENT_LIGHT_LEVEL_MAX) {
-    s_dynamic_backlight_min_threshold = AMBIENT_LIGHT_LEVEL_MAX;
-    return false;
-  }
-  s_dynamic_backlight_min_threshold = *threshold;
   return true;
 }
 #endif
@@ -858,9 +848,6 @@ void shell_prefs_init(void) {
   s_backlight_intensity = BACKLIGHT_INTENSITY_DEFAULT; // Medium
 #endif
   s_backlight_ambient_threshold = BOARD_CONFIG.ambient_light_dark_threshold;
-#ifdef CONFIG_DYNAMIC_BACKLIGHT
-  s_dynamic_backlight_min_threshold = BOARD_CONFIG.dynamic_backlight_min_threshold;
-#endif
 #ifdef CONFIG_BACKLIGHT_HAS_COLOR
   s_backlight_color = BOARD_CONFIG.backlight_default_color;
 #endif
@@ -915,14 +902,12 @@ void shell_prefs_init(void) {
   // the device follows the new lux board defaults.
   if (!s_als_threshold_migrated_v2) {
     s_backlight_ambient_threshold = BOARD_CONFIG.ambient_light_dark_threshold;
-#ifdef CONFIG_DYNAMIC_BACKLIGHT
-    s_dynamic_backlight_min_threshold = BOARD_CONFIG.dynamic_backlight_min_threshold;
-#endif
     SettingsFile v2file = {{0}};
     if (settings_file_open(&v2file, SHELL_PREFS_FILE_NAME, SHELL_PREFS_FILE_LEN) == S_SUCCESS) {
       settings_file_delete(&v2file, PREF_KEY_BACKLIGHT_AMBIENT_THRESHOLD,
                            sizeof(PREF_KEY_BACKLIGHT_AMBIENT_THRESHOLD));
 #ifdef CONFIG_DYNAMIC_BACKLIGHT
+      // Scrub the removed dyn-backlight-min-threshold pref while we're here.
       settings_file_delete(&v2file, PREF_KEY_DYNAMIC_BACKLIGHT_MIN_THRESHOLD,
                            sizeof(PREF_KEY_DYNAMIC_BACKLIGHT_MIN_THRESHOLD));
 #endif
@@ -1293,23 +1278,6 @@ void backlight_set_ambient_threshold(uint32_t threshold) {
   // Update the ambient light driver with the new threshold
   ambient_light_set_dark_threshold(threshold);
 }
-
-#ifdef CONFIG_DYNAMIC_BACKLIGHT
-uint32_t backlight_get_dynamic_min_threshold(void) {
-  return s_dynamic_backlight_min_threshold;
-}
-
-void backlight_set_dynamic_min_threshold(uint32_t threshold) {
-  // Validate threshold is within acceptable range
-  if (threshold > AMBIENT_LIGHT_LEVEL_MAX) {
-    threshold = AMBIENT_LIGHT_LEVEL_MAX;
-  }
-  // Note: Min threshold should be much smaller than ambient_light_dark_threshold (Zone 2 upper bound)
-  // Typically min_threshold is 0-5, while ambient_light_dark_threshold is ~150
-  prv_pref_set(PREF_KEY_DYNAMIC_BACKLIGHT_MIN_THRESHOLD, &threshold, sizeof(threshold));
-}
-
-#endif
 
 #ifdef CONFIG_ORIENTATION_MANAGER
 bool display_orientation_is_left(void) {

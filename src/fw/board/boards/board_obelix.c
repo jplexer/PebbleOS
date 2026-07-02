@@ -572,7 +572,6 @@ const BoardConfig BOARD_CONFIG = {
   .ambient_light_lux_dark_offset = 0,
   .ambient_light_lux_num = 100,
   .ambient_light_lux_den = 483,
-  .dynamic_backlight_min_threshold = 5,
   .backlight_default_color = BACKLIGHT_COLOR_WARM_WHITE,
 };
 
