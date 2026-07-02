@@ -112,9 +112,21 @@ bool touch_is_globally_enabled(void);
 void touch_set_globally_enabled(bool enable);
 
 #ifdef CONFIG_DYNAMIC_BACKLIGHT
-// Dynamic backlight intensity based on ambient light sensor
+// Dynamic backlight: how aggressively brightness ramps with ambient light.
+// Every mode keeps the same dim floor; the mode selects the lux level at
+// which the ramp reaches the user's max intensity (Bright = earliest).
+typedef enum BacklightDynamicMode {
+  BacklightDynamicMode_Off = 0,
+  BacklightDynamicMode_Bright = 1,
+  BacklightDynamicMode_Standard = 2,
+  BacklightDynamicMode_Dim = 3,
+  BacklightDynamicModeCount,
+} BacklightDynamicMode;
+
+BacklightDynamicMode backlight_get_dynamic_mode(void);
+void backlight_set_dynamic_mode(BacklightDynamicMode mode);
+// Convenience: mode != Off
 bool backlight_is_dynamic_intensity_enabled(void);
-void backlight_set_dynamic_intensity_enabled(bool enable);
 #endif
 
 // Motion sensitivity for accelerometer shake detection (0-100, lower = less sensitive)

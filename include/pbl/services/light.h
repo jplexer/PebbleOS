@@ -81,8 +81,12 @@ void light_toggle_enabled(void);
 //! @internal
 void light_toggle_ambient_sensor_enabled(void);
 
+#ifdef CONFIG_DYNAMIC_BACKLIGHT
 //! @internal
-void light_toggle_dynamic_intensity_enabled(void);
+//! Set the dynamic backlight mode and briefly turn the light on so the user
+//! sees the effect.
+void light_set_dynamic_mode(BacklightDynamicMode mode);
+#endif
 
 //! Switches for temporary disabling backlight (ie: low power mode)
 void light_allow(bool allowed);
