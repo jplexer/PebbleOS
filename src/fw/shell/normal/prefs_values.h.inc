@@ -59,6 +59,7 @@
   PREFS_MACRO(PREF_KEY_VIBE_LOG_INFO, s_vibe_log_info_enabled)
   PREFS_MACRO(PREF_KEY_SETTINGS_DBS_COMPACTED_V1, s_settings_dbs_compacted_v1)
   PREFS_MACRO(PREF_KEY_ALS_THRESHOLD_MIGRATED_V1, s_als_threshold_migrated_v1)
+  PREFS_MACRO(PREF_KEY_ALS_THRESHOLD_MIGRATED_V2, s_als_threshold_migrated_v2)
 #ifdef CONFIG_APP_SCALING
   PREFS_MACRO(PREF_KEY_LEGACY_APP_RENDER_MODE, s_legacy_app_render_mode)
 #endif

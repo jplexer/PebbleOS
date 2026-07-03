@@ -180,9 +180,16 @@ static uint32_t prv_get_als_level(void) {
   // framebuffer scan to at most once per TTL.
   level = als_compensation_correct(level);
 #endif
+  // Convert to lux (identity on boards without coefficients) so thresholds
+  // and the backlight ramp operate in device-independent units.
+  level = ambient_light_level_to_lux(level);
   s_als_cached_level = level;
   s_als_cached_ticks = now;
   return s_als_cached_level;
+}
+
+uint32_t light_get_ambient_lux(void) {
+  return prv_get_als_level();
 }
 
 static bool prv_als_is_light(void) {

@@ -96,5 +96,11 @@ uint8_t light_get_current_brightness_percent(void);
 //! fading out). Returns false only when the backlight is fully off.
 bool light_is_on(void);
 
+//! Ambient light level in lux: screen-compensated and converted with the
+//! board's calibration (raw counts pass through unchanged on boards without
+//! lux coefficients). Served from a short-lived cache; while the backlight is
+//! on, the last pre-backlight value is returned.
+uint32_t light_get_ambient_lux(void);
+
 //!   @} // group Light
 //! @} // group UI

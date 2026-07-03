@@ -366,7 +366,7 @@ static void prv_backlight_draw_row_cb(SettingsCallbacks *context, GContext *ctx,
     case SettingsBacklightAmbientSensor:
       title = i18n_noop("Ambient Sensor");
       if (backlight_is_ambient_sensor_enabled()) {
-        uint32_t als_value = ambient_light_get_light_level();
+        uint32_t als_value = light_get_ambient_lux();
         snprintf(data->als_value_buffer, sizeof(data->als_value_buffer),
                  i18n_get("On (%d)", data), (int)als_value);
         subtitle = data->als_value_buffer;

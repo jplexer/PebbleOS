@@ -366,7 +366,7 @@ static void prv_maybe_trigger_core_dump() {
 /////////////////////////////
 
 static void prv_update_als_threshold_label(NumberWindow *number_window, SettingsSystemData *data) {
-  uint32_t current_reading = ambient_light_get_light_level();
+  uint32_t current_reading = light_get_ambient_lux();
   uint32_t current_threshold = (uint32_t)number_window_get_value(number_window);
   bool would_backlight_be_on = current_reading <= current_threshold;
   
@@ -407,7 +407,7 @@ static void prv_als_threshold_menu_push(SettingsSystemData *data) {
   psleep(200);
   
   // Get current ambient light reading to show backlight status
-  uint32_t current_reading = ambient_light_get_light_level();
+  uint32_t current_reading = light_get_ambient_lux();
   uint32_t current_threshold = backlight_get_ambient_threshold();
   bool would_backlight_be_on = current_reading <= current_threshold;
   
@@ -434,9 +434,9 @@ static void prv_als_threshold_menu_push(SettingsSystemData *data) {
   }
   
   
-  // Set reasonable min/max values for ALS threshold
+  // Set reasonable min/max values for ALS threshold (lux domain)
   number_window_set_min(number_window, 0);
-  number_window_set_max(number_window, AMBIENT_LIGHT_LEVEL_MAX);
+  number_window_set_max(number_window, ambient_light_level_to_lux(AMBIENT_LIGHT_LEVEL_MAX));
   number_window_set_step_size(number_window, 1);
   number_window_set_value(number_window, (int32_t)current_threshold);
   
