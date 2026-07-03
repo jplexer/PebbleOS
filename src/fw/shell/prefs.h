@@ -127,6 +127,21 @@ BacklightDynamicMode backlight_get_dynamic_mode(void);
 void backlight_set_dynamic_mode(BacklightDynamicMode mode);
 // Convenience: mode != Off
 bool backlight_is_dynamic_intensity_enabled(void);
+
+// Backlight presets bundle the ambient sensor, dynamic mode and intensity
+// settings into one user-facing mode; Advanced exposes the three settings
+// individually. A stored preset only reports as active while the underlying
+// settings still match its values, otherwise Advanced is reported.
+typedef enum BacklightPreset {
+  BacklightPreset_MaxBrightness = 0,
+  BacklightPreset_Standard = 1,
+  BacklightPreset_BatterySaver = 2,
+  BacklightPreset_Advanced = 3,
+  BacklightPresetCount,
+} BacklightPreset;
+
+BacklightPreset backlight_get_preset(void);
+void backlight_set_preset(BacklightPreset preset);
 #endif
 
 // Motion sensitivity for accelerometer shake detection (0-100, lower = less sensitive)
