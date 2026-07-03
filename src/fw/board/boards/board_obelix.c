@@ -566,7 +566,7 @@ const BoardConfigPower BOARD_CONFIG_POWER = {
 const BoardConfig BOARD_CONFIG = {
   .backlight_on_percent = 45,
   .ambient_light_dark_threshold = 800,
-  .ambient_k_delta_threshold = 133,
+  .ambient_k_delta_threshold = 100,
   // Bench-calibrated on 3 production units (unit spread 1.3%); dark floor
   // is <20 counts so no offset is needed.
   .ambient_light_lux_dark_offset = 0,

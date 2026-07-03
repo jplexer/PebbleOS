@@ -240,6 +240,7 @@ static uint8_t s_timeline_peek_unsupported_face_mode = TimelinePeekUnsupportedFa
 #define PREF_KEY_VIBE_LOG_INFO "vibeLogInfo"
 #define PREF_KEY_SETTINGS_DBS_COMPACTED_V1 "settingsDbsCompactedV1"
 #define PREF_KEY_ALS_THRESHOLD_MIGRATED_V1 "alsThresholdMigratedV1"
+#define PREF_KEY_ALS_THRESHOLD_MIGRATED_V2 "alsThresholdMigratedV2"
 #ifdef CONFIG_APP_SCALING
 #define PREF_KEY_LEGACY_APP_RENDER_MODE "legacyAppRenderMode"
 #endif
@@ -249,6 +250,7 @@ static bool s_accel_shake_log_info_enabled = false;
 static bool s_vibe_log_info_enabled = false;
 static bool s_settings_dbs_compacted_v1 = false;
 static bool s_als_threshold_migrated_v1 = false;
+static bool s_als_threshold_migrated_v2 = false;
 #ifdef CONFIG_APP_SCALING
 static uint8_t s_legacy_app_render_mode = 1; // Default to scaled mode
 #endif
@@ -717,6 +719,11 @@ static bool prv_set_s_als_threshold_migrated_v1(bool *done) {
   return true;
 }
 
+static bool prv_set_s_als_threshold_migrated_v2(bool *done) {
+  s_als_threshold_migrated_v2 = *done;
+  return true;
+}
+
 #ifdef CONFIG_APP_SCALING
 static bool prv_set_s_legacy_app_render_mode(uint8_t *mode) {
   if (*mode >= LegacyAppRenderModeCount) {
@@ -901,6 +908,28 @@ void shell_prefs_init(void) {
     }
     const bool migrated = true;
     prv_pref_set(PREF_KEY_ALS_THRESHOLD_MIGRATED_V1, &migrated, sizeof(migrated));
+  }
+
+  // One-time: the ALS pipeline switched from raw counts to lux, so stored
+  // threshold overrides are in the wrong unit (~5x too high). Drop them so
+  // the device follows the new lux board defaults.
+  if (!s_als_threshold_migrated_v2) {
+    s_backlight_ambient_threshold = BOARD_CONFIG.ambient_light_dark_threshold;
+#ifdef CONFIG_DYNAMIC_BACKLIGHT
+    s_dynamic_backlight_min_threshold = BOARD_CONFIG.dynamic_backlight_min_threshold;
+#endif
+    SettingsFile v2file = {{0}};
+    if (settings_file_open(&v2file, SHELL_PREFS_FILE_NAME, SHELL_PREFS_FILE_LEN) == S_SUCCESS) {
+      settings_file_delete(&v2file, PREF_KEY_BACKLIGHT_AMBIENT_THRESHOLD,
+                           sizeof(PREF_KEY_BACKLIGHT_AMBIENT_THRESHOLD));
+#ifdef CONFIG_DYNAMIC_BACKLIGHT
+      settings_file_delete(&v2file, PREF_KEY_DYNAMIC_BACKLIGHT_MIN_THRESHOLD,
+                           sizeof(PREF_KEY_DYNAMIC_BACKLIGHT_MIN_THRESHOLD));
+#endif
+      settings_file_close(&v2file);
+    }
+    const bool migrated_v2 = true;
+    prv_pref_set(PREF_KEY_ALS_THRESHOLD_MIGRATED_V2, &migrated_v2, sizeof(migrated_v2));
   }
 #endif
 
