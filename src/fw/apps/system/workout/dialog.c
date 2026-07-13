@@ -127,20 +127,8 @@ static void prv_workout_dialog_load(Window *window) {
   }
 
   // Icon
-  // On rectangular displays we just center it horizontally b/w the left edge of the display and
-  // the left edge of the action bar
-#if PBL_RECT
+  // Center it horizontally b/w the left edge of the display and the left edge of the action bar
   x = (grect_get_max_x(bounds) - action_bar_width - icon_size.w) / 2;
-#else
-  // On round displays we right align it with respect to the same imaginary vertical line that the
-  // text is right aligned to if action bar is present otherwise do what rect does
-  if (show_action_bar) {
-    x = grect_get_max_x(bounds) - action_bar_width - content_and_action_bar_horizontal_spacing -
-            icon_size.w;
-  } else {
-    x = (grect_get_max_x(bounds) - action_bar_width - icon_size.w) / 2;
-  }
-#endif
 
   y = icon_top_margin_px;
 
