@@ -789,7 +789,11 @@ int accel_peek(AccelDriverSample *data) {
     return E_ERROR;
   }
 
-  // If sampling is active, return the last obtained sample
+  // If sampling is active, the FIFO batches samples for subscribers, so the
+  // cached sample can be a full watermark period old. The FIFO is read through
+  // the output registers, so peeking those directly would steal a sample from
+  // the stream; drain the FIFO instead, which refreshes the cached sample and
+  // dispatches the queued samples to subscribers.
   if (LIS2DW12->state->num_samples > 0U) {
     // Self-heal: a stalled stream would otherwise freeze peek data forever
     if (!LIS2DW12->state->recovery_pending &&
@@ -797,6 +801,8 @@ int accel_peek(AccelDriverSample *data) {
       LIS2DW12->state->recovery_pending = true;
       accel_offload_work(prv_stall_check_work_cb);
     }
+
+    prv_lis2dw12_drain_fifo();
 
     if (!LIS2DW12->state->last_sample_valid) {
       return E_ERROR;
