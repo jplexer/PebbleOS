@@ -261,13 +261,6 @@ static void prv_lsm6dso_process_samples(uint16_t num_samples, uint64_t timestamp
   };
 
   accel_cb_new_samples(&batch);
-
-  // Keep the most recent sample around for accel_peek().
-  uint8_t *last = &LSM6DSO->state->raw_sample_buf[(num_samples - 1) * LSM6DSO_FIFO_WORD_SIZE_BYTES];
-  prv_raw_to_mg(&last[1], &LSM6DSO->state->last_sample);
-  LSM6DSO->state->last_sample.timestamp_us =
-      timestamp_us + (num_samples - 1) * LSM6DSO->state->sampling_interval_us;
-  LSM6DSO->state->last_sample_valid = true;
 }
 
 static uint8_t prv_get_bdr(uint32_t sampling_interval_us) {
@@ -822,7 +815,6 @@ void accel_set_num_samples(uint32_t num_samples) {
       return;
     }
 
-    LSM6DSO->state->last_sample_valid = false;
     LSM6DSO->state->last_fifo_read_tick = rtc_get_ticks();
     LSM6DSO->state->int1_period_ms = (LSM6DSO->state->sampling_interval_us * num_samples) / 1000;
     regular_timer_add_multisecond_callback(&LSM6DSO->state->int1_wdt_timer,
@@ -853,7 +845,9 @@ int accel_peek(AccelDriverSample *data) {
     return E_ERROR;
   }
 
-  // If sampling is active, return the last obtained sample
+  // If sampling is active, the FIFO batches samples for subscribers, so the
+  // cached sample can be a full watermark period old. Read the output
+  // registers instead: they update at ODR independently of the FIFO.
   if (LSM6DSO->state->num_samples > 0U) {
     // Self-heal: a stalled stream would otherwise freeze peek data forever
     if (!LSM6DSO->state->recovery_pending &&
@@ -862,10 +856,15 @@ int accel_peek(AccelDriverSample *data) {
       accel_offload_work(prv_stall_check_work_cb);
     }
 
-    if (!LSM6DSO->state->last_sample_valid) {
+    ret = prv_lsm6dso_read(LSM6DSO_OUTX_L_A, raw, sizeof(raw));
+    if (!ret) {
+      PBL_LOG_ERR("Failed to read sample");
       return E_ERROR;
     }
-    *data = LSM6DSO->state->last_sample;
+
+    prv_raw_to_mg(raw, data);
+    data->timestamp_us = prv_get_curr_system_time_us();
+
     return 0;
   }
 
