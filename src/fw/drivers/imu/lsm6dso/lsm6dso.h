@@ -32,8 +32,6 @@ typedef struct LSM6DSOState {
   uint32_t int1_period_ms;
   uint32_t num_recoveries;
   uint8_t wk_ths_curr;
-  AccelDriverSample last_sample;
-  bool last_sample_valid;
   bool recovery_pending;
   bool wu_active;
 } LSM6DSOState;
