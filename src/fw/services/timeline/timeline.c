@@ -879,10 +879,6 @@ void timeline_invoke_action(const TimelineItem *item, const TimelineItemAction *
     {
       prv_perform_ancs_negative_action(item, action);
       notification_storage_set_status(&item->header.id, TimelineItemStatusDismissed);
-      // Freed by the event system once consumed
-      Uuid *notification_id = kernel_malloc_check(sizeof(Uuid));
-      *notification_id = item->header.id;
-      notifications_handle_notification_acted_upon(notification_id);
       break;
     }
     case TimelineItemActionTypeDismiss:
