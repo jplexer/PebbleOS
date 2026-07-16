@@ -14,7 +14,7 @@ jobs:
           fetch-depth: 0
 
       - name: Rebase onto target branch
-        uses: ./.github/actions/rebase
+        uses: coredevices/pebbleos/.github/actions/rebase@9ee5c919d9d42833b1d96abe1f00da6f8cc2d8eb
 
       - name: Install GitLint
         run: pip install gitlint
@@ -32,7 +32,7 @@ jobs:
           fetch-depth: 0
 
       - name: Rebase onto target branch
-        uses: ./.github/actions/rebase
+        uses: coredevices/pebbleos/.github/actions/rebase@9ee5c919d9d42833b1d96abe1f00da6f8cc2d8eb
 
       - name: Install ruff
         run: pip install ruff
@@ -72,7 +72,7 @@ jobs:
           fetch-depth: 0
 
       - name: Rebase onto target branch
-        uses: ./.github/actions/rebase
+        uses: coredevices/pebbleos/.github/actions/rebase@9ee5c919d9d42833b1d96abe1f00da6f8cc2d8eb
 
       - name: Check SPDX license headers
         run: |

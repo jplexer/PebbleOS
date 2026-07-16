@@ -47,7 +47,7 @@ jobs:
           submodules: true
 
       - name: Rebase onto target branch
-        uses: ./.github/actions/rebase
+        uses: coredevices/pebbleos/.github/actions/rebase@9ee5c919d9d42833b1d96abe1f00da6f8cc2d8eb
         with:
           submodules: true
 
