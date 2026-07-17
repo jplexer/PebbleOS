@@ -46,7 +46,7 @@ static const uint16_t protocol_time_endpoint_id = 11;
 static RegularTimerInfo s_dst_checker;
 
 #ifndef CONFIG_RECOVERY_FW
-// Armed after system resources are initialized.
+// Armed once the services the chime path uses are initialized.
 static bool s_hourly_chime_armed;
 #define HOURLY_CHIME_GRACE_PERIOD_SECONDS 5
 #endif
