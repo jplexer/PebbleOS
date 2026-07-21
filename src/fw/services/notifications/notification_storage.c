@@ -476,7 +476,9 @@ static bool prv_rewrite_iter_next(NotificationIterState *iter_state) {
   }
 
   if (iter_state->header.common.status & TimelineItemStatusDeleted) {
-    return true;
+    // Deleted entries are not read into iter_state->notification; skip the payload so the next
+    // iteration reads a record header, not payload bytes
+    return pfs_seek(iter_state->fd, iter_state->header.payload_length, FSeekCur) >= 0;
   }
   return prv_get_notification(&iter_state->notification, &iter_state->header, iter_state->fd);
 }
@@ -668,13 +670,23 @@ void notification_storage_rewrite(void (*iter_callback)(TimelineItem *notificati
   };
   iter_init(&iter, (IteratorCallback)prv_rewrite_iter_next, NULL, &iter_state);
 
+  int write_offset = 0;
   while (iter_next(&iter)) {
     uint8_t status = iter_state.header.common.status;
-    if (!(status & TimelineItemStatusDeleted)) {
-      iter_callback(&iter_state.notification, &iter_state.header, data);
+    if (status & TimelineItemStatusDeleted) {
+      // Drop deleted entries; iter_state.notification still holds the previous item, whose
+      // buffer has already been written and freed
+      continue;
     }
-    prv_write_notification(&iter_state.notification, &iter_state.header, new_fd);
+    iter_callback(&iter_state.notification, &iter_state.header, data);
+    int result = prv_write_notification(&iter_state.notification, &iter_state.header, new_fd);
+    timeline_item_free_allocated_buffer(&iter_state.notification);
+    if (result < 0) {
+      break;
+    }
+    write_offset += result;
   }
+  s_write_offset = write_offset;
 
   // Close the old file
   prv_file_close(fd);
