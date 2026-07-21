@@ -231,11 +231,14 @@ static bool prv_compress(size_t size_needed, int *fd) {
       char uuid_buffer[UUID_STRING_BUFFER_LENGTH];
       uuid_to_string(&iter_state.header.common.id, uuid_buffer);
       PBL_LOG_ERR("Failed to write notification %s during compression (error %d). Resetting all notifications.", uuid_buffer, result);
-      kernel_free(notification.allocated_buffer);
+      // The buffer comes from the calling task's heap (timeline_item_deserialize_item), so it
+      // must not be freed with kernel_free: compression can run on the app task, e.g. when a
+      // workout summary notification is stored while storage is full.
+      timeline_item_free_allocated_buffer(&notification);
       goto cleanup;
     }
     write_offset += result;
-    kernel_free(notification.allocated_buffer);
+    timeline_item_free_allocated_buffer(&notification);
   }
 
   s_write_offset = write_offset;
