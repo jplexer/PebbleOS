@@ -322,7 +322,7 @@ static bool prv_save_state(ActivitySettingsKey key, void *val, size_t val_len) {
 static void prv_build_notification_attr_list(AttributeList *attr_list, const char *body,
                                              uint32_t icon, ActivityInsightType insight_type,
                                              ActivitySessionType activity_type) {
-  attribute_list_add_uint32(attr_list, AttributeIdIconTiny, icon);
+  attribute_list_add_resource_id(attr_list, AttributeIdIconTiny, icon);
   attribute_list_add_cstring(attr_list, AttributeIdBody, body);
   attribute_list_add_uint8(attr_list, AttributeIdBgColor, GColorOrangeARGB8);
   attribute_list_add_uint8(attr_list, AttributeIdHealthInsightType, insight_type);
