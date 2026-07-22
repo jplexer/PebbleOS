@@ -63,14 +63,6 @@ static bool prv_app_filter_callback(struct AppMenuDataSource *source, AppInstall
       if (uuid_equal(&entry->uuid, &timeline_past_uuid)) {
         return false;
       }
-      // We also only want the Health app for Tap Up
-      if (uuid_equal(&entry->uuid, &health_uuid)) {
-        return false;
-      }
-    } else {
-        if (uuid_equal(&entry->uuid, &health_uuid)) {
-          return false;
-        }
     }
   }
   
