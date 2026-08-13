@@ -673,6 +673,12 @@
       "id": -100,
       "enum": "NOTIFICATIONS_CLEAR_HISTORY",
       "md_fn": "notifications_clear_history_app_get_info"
+    },
+    {
+      "id": -101,
+      "enum": "FIND_MY_PHONE",
+      "md_fn": "find_my_phone_get_app_info",
+      "color_argb8": "GColorRedARGB8"
     }
   ],
   "resource_apps": [
