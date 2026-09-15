@@ -12,6 +12,8 @@ permissions:
 jobs:
   build-firmware:
     uses: ./.github/workflows/build-firmware.yml
+    with:
+      collect_translation_sources: true
     secrets: inherit
 
   build-prf:
@@ -52,7 +54,7 @@ jobs:
       - name: Collect release files
         run: |
           mkdir release
-          find artifacts -type f -exec cp {} release/ \;
+          find artifacts -type f ! -path 'artifacts/translation-source-*/*' ! -path 'artifacts/translation-source/*' -exec cp {} release/ \;
           ls -l release
 
       - name: Create release
@@ -66,3 +68,7 @@ jobs:
         with:
           version: ${{ env.TAG }}
           token: ${{ secrets.ENGDASH_OTA_TOKEN }}
+
+  translation-sources:
+    needs: release
+    uses: ./.github/workflows/translation-sources.yml

@@ -1,0 +1,42 @@
+name: Prepare Translation Sources
+
+# Called only after the release workflow succeeds. No service
+# URL or credentials are used; publishing will be a separate opt-in integration.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: translation-source-*
+          path: source-inputs
+      - name: Install catalog tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gettext
+          python -m pip install polib==1.2.0
+      - name: Test catalog preparation
+        run: PYTHONPATH=tools python -m unittest discover -s tools/tests -p test_prepare_translation_source.py
+      - name: Merge firmware catalogs
+        shell: bash
+        run: |
+          mapfile -d '' catalogs < <(find source-inputs -name '*.pot' -print0 | sort -z)
+          test "${#catalogs[@]}" -gt 0
+          mkdir -p translation-source
+          python tools/prepare_translation_source.py "${catalogs[@]}" \
+            --output translation-source/pebbleos.pot > translation-source/catalog.json
+          cat source-inputs/*/firmware-revision.txt | sort -u > translation-source/firmware-revision.txt
+          test "$(wc -l < translation-source/firmware-revision.txt)" -eq 1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: translation-source
+          path: translation-source/
+          if-no-files-found: error
