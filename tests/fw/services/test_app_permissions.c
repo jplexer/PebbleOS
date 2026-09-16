@@ -115,7 +115,7 @@ void test_app_permissions__initialize(void) {
   fake_event_init();
   s_has_record = false;
   s_num_sets = 0;
-  s_md = (PebbleProcessMd){.uuid = s_uuid_app, .uses_microphone = true};
+  s_md = (PebbleProcessMd){.uuid = s_uuid_app, .uses_microphone = true, .is_unprivileged = true};
   s_current_md = &s_md;
   s_current_id = 1;
   s_blob_db_subscription = NULL;
@@ -189,8 +189,13 @@ void test_app_permissions__current_app(void) {
 }
 
 void test_app_permissions__system_apps_always_granted(void) {
-  s_current_id = -5; // system install ids are negative
   s_md.uses_microphone = false;
+  s_current_id = -5; // system install ids are negative
+  cl_assert_equal_i(AppPermissionStateGranted,
+                    app_permissions_get_state_for_current_app(AppPermission_Microphone));
+  // Built-in apps launched without an install id (e.g. from the console) are privileged
+  s_current_id = 0;
+  s_md.is_unprivileged = false;
   cl_assert_equal_i(AppPermissionStateGranted,
                     app_permissions_get_state_for_current_app(AppPermission_Microphone));
 }

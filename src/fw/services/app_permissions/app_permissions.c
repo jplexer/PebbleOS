@@ -54,7 +54,8 @@ AppPermissionState app_permissions_get_state_for_current_app(AppPermission permi
   if (!md || (permission >= AppPermissionCount)) {
     return AppPermissionStateNotDeclared;
   }
-  if (app_install_id_from_system(app_manager_get_current_app_id())) {
+  // Apps built into the firmware are trusted with everything.
+  if (!md->is_unprivileged || app_install_id_from_system(app_manager_get_current_app_id())) {
     return AppPermissionStateGranted;
   }
   return app_permissions_get_state_for_app(&md->uuid, prv_md_declares(md, permission), permission);
