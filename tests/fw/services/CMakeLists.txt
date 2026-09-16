@@ -311,6 +311,15 @@ pbl_clar_test(test_mic_manager
   OVERRIDES dummy_board
 )
 
+pbl_clar_test(test_mic_capture_service
+  SOURCES
+    src/fw/services/mic_capture/mic_capture_service.c
+    src/fw/services/mic_manager/mic_manager.c
+    lib/util/circular_buffer.c
+    tests/fakes/fake_events.c
+  OVERRIDES dummy_board
+)
+
 pbl_clar_test(test_app_permissions
   SOURCES
     src/fw/services/app_permissions/app_permissions.c
