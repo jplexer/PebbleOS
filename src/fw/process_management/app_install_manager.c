@@ -185,6 +185,10 @@ bool app_install_entry_has_worker(const AppInstallEntry *entry) {
   return (entry->has_worker);
 }
 
+bool app_install_entry_uses_microphone(const AppInstallEntry *entry) {
+  return (entry->uses_microphone);
+}
+
 bool app_install_entry_is_hidden(const AppInstallEntry *entry) {
   switch (entry->visibility) {
     case ProcessVisibilityHidden:
@@ -644,6 +648,7 @@ static bool prv_app_install_entry_from_app_db_entry(AppInstallId id, AppDBEntry 
     // applications registered with the manager are applications, not workers.
     .process_type = process_metadata_flags_process_type(db_entry->info_flags, PebbleTask_App),
     .has_worker = process_metadata_flags_has_worker(db_entry->info_flags),
+    .uses_microphone = process_metadata_flags_uses_microphone(db_entry->info_flags),
     .icon_resource_id = db_entry->icon_resource_id,
     .uuid = db_entry->uuid,
     .color = prv_valid_color_from_uuid(db_entry->app_face_bg_color, (Uuid *)&db_entry->uuid),
@@ -674,6 +679,7 @@ static bool prv_app_install_entry_from_resource_registry_entry(const AppRegistry
     // applications registered with the manager are applications, not workers.
     .process_type = process_metadata_flags_process_type(app_header->flags, PebbleTask_App),
     .has_worker = process_metadata_flags_has_worker(app_header->flags),
+    .uses_microphone = process_metadata_flags_uses_microphone(app_header->flags),
     .icon_resource_id = reg_entry->icon_resource_id,
     .uuid = reg_entry->uuid,
     .color = prv_valid_color_from_uuid(reg_entry->color, (Uuid *)&reg_entry->uuid),

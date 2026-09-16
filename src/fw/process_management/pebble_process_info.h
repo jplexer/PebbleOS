@@ -37,6 +37,8 @@ typedef enum {
 
   //! True, if process uses Moddable XS APIs
   PROCESS_INFO_MODDABLE_APP = 1 << 10,
+  //! Process declares the microphone permission (bits 12-31 are free)
+  PROCESS_INFO_USES_MICROPHONE = 1 << 11,
   //! SDK older than 4.2 doesn't store any value
   PROCESS_INFO_PLATFORM_UNKNOWN = 0x0 << 6,
   PROCESS_INFO_PLATFORM_APLITE = 0x1 << 6,
