@@ -20,6 +20,7 @@
 #include "pbl/mcu/privilege.h"
 #include "popups/health_tracking_ui.h"
 #include "popups/timeline/peek.h"
+#include "popups/mic_banner.h"
 #include "process_management/app_run_state.h"
 #include "process_management/pebble_process_md.h"
 #include "process_management/process_heap.h"
@@ -297,7 +298,9 @@ static bool prv_app_start(const PebbleProcessMd *app_md, const void *args,
   const ProcessAppSDKType sdk_type = process_metadata_get_app_sdk_type(app_md);
 
   // The rest of app_ram is available for app_state to use as it sees fit.
-  if (!app_state_configure(&app_ram, sdk_type, timeline_peek_get_obstruction_origin_y())) {
+  const int16_t obstruction_y =
+      MIN(timeline_peek_get_obstruction_origin_y(), mic_banner_get_obstruction_origin_y());
+  if (!app_state_configure(&app_ram, sdk_type, obstruction_y)) {
     PBL_LOG_ERR("App state configuration failed");
     return false;
   }

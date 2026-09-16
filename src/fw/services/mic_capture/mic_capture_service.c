@@ -3,6 +3,7 @@
 
 #include "pbl/services/mic_capture/mic_capture_service.h"
 
+#include "kernel/event_loop.h"
 #include "kernel/events.h"
 #include "kernel/pbl_malloc.h"
 #include "kernel/ui/modals/modal_manager.h"
@@ -10,6 +11,7 @@
 #include "pbl/services/app_permissions/app_permissions.h"
 #include "pbl/services/mic_manager.h"
 #include "pbl/util/circular_buffer.h"
+#include "popups/mic_banner.h"
 #include <pbl/logging/logging.h>
 
 #include <string.h>
@@ -31,6 +33,15 @@ typedef struct {
 
 static PBL_MUTEX_DEFINE(s_lock);
 static MicCaptureState s_state;
+
+// The banner is UI, so it is driven from KernelMain whichever task stops or starts capture.
+static void prv_show_banner_cb(void *unused) {
+  mic_banner_show();
+}
+
+static void prv_hide_banner_cb(void *unused) {
+  mic_banner_hide();
+}
 
 void mic_capture_service_init(void) {
   s_state = (MicCaptureState){};
@@ -59,6 +70,7 @@ static void prv_teardown_locked(void) {
   kernel_free(s_state.chunk);
   s_state.ring_storage = NULL;
   s_state.chunk = NULL;
+  launcher_task_add_callback(prv_hide_banner_cb, NULL);
 }
 
 //! Stops capture for a system-originated reason and tells the app. `release_mic` is false when
@@ -169,6 +181,7 @@ MicCaptureStartResult mic_capture_service_start(PebbleTask owner, uint16_t sampl
     return MicCaptureStartErrBusy;
   }
 
+  launcher_task_add_callback(prv_show_banner_cb, NULL);
   PBL_LOG_DBG("Capture started, %u samples per update", samples_per_update);
   return MicCaptureStartOk;
 }
