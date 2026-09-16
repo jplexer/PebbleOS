@@ -95,6 +95,22 @@ through the unobstructed area service, composing with Timeline Peek, so
 `layer_get_unobstructed_bounds()` shrinks for the app. Any modal that could
 hide the banner also takes focus, which is what stops capture.
 
+## Streaming to the phone
+
+`mic_stream_to_phone_start()` (applib) skips the app entirely: the capture
+service opens the Speex encoder, sets up an audio endpoint transfer and asks
+the phone for a `VoiceEndpointSessionTypeAudioStream` session over the voice
+endpoint, tagged with the app UUID (untagged for built-in apps). Once the
+phone accepts, the mic starts and every frame is encoded on KernelBG and sent
+over the audio endpoint (10000), exactly like dictation but with no result
+expected. The app is told through `started`, and through `stopped` with
+`MicDataStopReasonPhone` if the phone refuses, stops, or never answers (8 s).
+Dictation preempts a stream the same way it preempts capture.
+
+On the phone, `VoiceSessionManager` answers the session, decodes the frames
+and publishes them as PCM to the app's PebbleKit JS runtime as
+`audiostream` events (see `WatchAudioStreams`).
+
 ## Encoding
 
 Raw PCM is too much for the Bluetooth link. `audio_encoder_open()` (applib)

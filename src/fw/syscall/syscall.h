@@ -109,6 +109,7 @@ uint8_t sys_app_permission_get_state(uint8_t permission);
 
 //! Live microphone capture for the app task. See mic_capture_service.h.
 uint8_t sys_mic_capture_start(uint16_t samples_per_update);
+uint8_t sys_mic_capture_start_stream(void);
 void sys_mic_capture_stop(void);
 uint32_t sys_mic_capture_read(int16_t *out, uint32_t max_samples);
 uint32_t sys_mic_capture_get_available(void);

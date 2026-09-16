@@ -14,8 +14,9 @@
 #include <inttypes.h>
 #include <stdio.h>
 
-// Exercises the Microphone API: SELECT toggles capture, the screen shows the permission state,
-// the RMS level of the last batch and the unobstructed height (which shrinks under the banner).
+// Exercises the Microphone API: SELECT toggles capture, UP toggles streaming to the phone. The
+// screen shows the permission state, the RMS level of the last batch and the unobstructed height
+// (which shrinks under the banner).
 
 #define SAMPLES_PER_UPDATE (320) // 20 ms
 
@@ -75,6 +76,7 @@ static void prv_stopped_handler(MicDataStopReason reason, void *context) {
     [MicDataStopReasonInterrupted] = "interrupted",
     [MicDataStopReasonPermissionRevoked] = "revoked",
     [MicDataStopReasonError] = "error",
+    [MicDataStopReasonPhone] = "phone ended",
   };
   PBL_LOG_DBG("mic demo: capture stopped (%s)", s_reasons[reason]);
   prv_update_status(data, s_reasons[reason]);
@@ -110,8 +112,27 @@ static void prv_select_click_handler(ClickRecognizerRef recognizer, void *contex
   prv_update_status(data, s_results[rv]);
 }
 
+static void prv_stream_started(void *context) {
+  PBL_LOG_DBG("mic demo: phone accepted the stream");
+  prv_update_status(context, "streaming");
+}
+
+static void prv_up_click_handler(ClickRecognizerRef recognizer, void *context) {
+  MicDemoAppData *data = context;
+  if (mic_stream_to_phone_is_active()) {
+    mic_stream_to_phone_stop();
+    prv_update_status(data, "idle");
+    return;
+  }
+  const MicDataStartResult rv = mic_stream_to_phone_start(
+      (MicStreamHandlers){.started = prv_stream_started, .stopped = prv_stopped_handler}, data);
+  PBL_LOG_DBG("mic demo: stream -> %u", rv);
+  prv_update_status(data, (rv == MicDataStartOk) ? "waiting for phone" : "stream refused");
+}
+
 static void prv_click_config_provider(void *context) {
   window_single_click_subscribe(BUTTON_ID_SELECT, prv_select_click_handler);
+  window_single_click_subscribe(BUTTON_ID_UP, prv_up_click_handler);
 }
 
 static void prv_unobstructed_did_change(void *context) {
@@ -131,7 +152,7 @@ static void prv_window_load(Window *window) {
   text_layer_set_text_alignment(&data->level_layer, GTextAlignmentCenter);
   layer_add_child(&window->layer, &data->level_layer.layer);
 
-  prv_update_status(data, "press SELECT");
+  prv_update_status(data, "SELECT: capture UP: stream");
 }
 
 static void prv_handle_init(void) {
@@ -153,6 +174,7 @@ static void prv_handle_init(void) {
 static void prv_handle_deinit(void) {
   MicDemoAppData *data = app_state_get_user_data();
   mic_data_service_unsubscribe();
+  mic_stream_to_phone_stop();
   app_permission_service_unsubscribe();
   app_unobstructed_area_service_unsubscribe();
   app_free(data);

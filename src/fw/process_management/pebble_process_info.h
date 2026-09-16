@@ -173,9 +173,10 @@ typedef enum {
 // sdk.major:0x5 .minor:0x6b -- Add app permissions API (rev 110)
 // sdk.major:0x5 .minor:0x6c -- Add Microphone API (mic_data_service_subscribe) (rev 111)
 // sdk.major:0x5 .minor:0x6d -- Add AudioEncoder API (audio_encoder_open) (rev 112)
+// sdk.major:0x5 .minor:0x6e -- Add mic_stream_to_phone_start() (rev 113)
 
 #define PROCESS_INFO_CURRENT_SDK_VERSION_MAJOR 0x5
-#define PROCESS_INFO_CURRENT_SDK_VERSION_MINOR 0x6d
+#define PROCESS_INFO_CURRENT_SDK_VERSION_MINOR 0x6e
 
 // The first SDK to ship with 2.x APIs
 #define PROCESS_INFO_FIRST_2X_SDK_VERSION_MAJOR 0x4

@@ -59,6 +59,8 @@ typedef enum MicDataStopReason {
   MicDataStopReasonPermissionRevoked,
   //! An unexpected error
   MicDataStopReasonError,
+  //! The phone refused, stopped or lost the stream (streaming only)
+  MicDataStopReasonPhone,
 } MicDataStopReason;
 
 //! Handler receiving a batch of samples.
@@ -94,8 +96,31 @@ MicDataStartResult mic_data_service_subscribe(uint32_t samples_per_update, MicDa
 //! Stops capturing. Safe to call when not capturing.
 void mic_data_service_unsubscribe(void);
 
-//! @return true while the app is capturing
+//! @return true while the app is capturing or streaming
 bool mic_data_service_is_active(void);
+
+//! Handler called once the phone has accepted the stream and audio is flowing.
+typedef void (*MicStreamStartedHandler)(void *context);
+
+typedef struct MicStreamHandlers {
+  MicStreamStartedHandler started;
+  MicDataStoppedHandler stopped;
+} MicStreamHandlers;
+
+//! Streams the microphone straight to the phone, encoded (Speex wideband, ~10 kbps), instead of
+//! delivering samples to the app. The phone decodes it and hands the PCM to the app's
+//! companion (PebbleKit JS `audiostream` events). The same rules as
+//! \ref mic_data_service_subscribe apply; in addition the phone has to accept the stream, which
+//! is reported through `started`, and can end it, reported as \ref MicDataStopReasonPhone.
+//! @param handlers `stopped` is required
+//! @param context Passed to the handlers
+MicDataStartResult mic_stream_to_phone_start(MicStreamHandlers handlers, void *context);
+
+//! Stops streaming. Safe to call when not streaming.
+void mic_stream_to_phone_stop(void);
+
+//! @return true while the app is streaming to the phone (including the setup handshake)
+bool mic_stream_to_phone_is_active(void);
 
 //!   @} // end addtogroup Microphone
 //! @} // end addtogroup Foundation

@@ -6,8 +6,13 @@
 #include "kernel/events.h"
 #include "kernel/ui/modals/modal_manager.h"
 #include "pbl/services/app_permissions/app_permissions.h"
+#include "pbl/services/audio_encoder/audio_encoder.h"
+#include "pbl/services/audio_endpoint.h"
 #include "pbl/services/mic_capture/mic_capture_service.h"
 #include "pbl/services/mic_manager.h"
+#include "pbl/services/voice_endpoint.h"
+#include "process_management/app_manager.h"
+#include "process_management/pebble_process_md.h"
 
 #include <string.h>
 
@@ -23,6 +28,123 @@
 #include "stubs_passert.h"
 #include "stubs_event_loop.h"
 #include "stubs_mic_banner.h"
+#include "fake_new_timer.h"
+
+// Current app
+////////////////////////////////////////////////////////////////
+
+static PebbleProcessMd s_md = {.is_unprivileged = true};
+
+const PebbleProcessMd *app_manager_get_current_app_md(void) {
+  return &s_md;
+}
+
+AppInstallId app_manager_get_current_app_id(void) {
+  return 1;
+}
+
+bool app_install_id_from_system(AppInstallId id) {
+  return (id < 0);
+}
+
+static bool s_watchface_running;
+
+bool app_manager_is_watchface_running(void) {
+  return s_watchface_running;
+}
+
+// Fake encoder + endpoints for the phone sink
+////////////////////////////////////////////////////////////////
+
+#define FAKE_FRAME_SAMPLES (320)
+
+static bool s_encoder_open;
+static int s_encoder_open_count;
+static int s_encoder_close_count;
+static int s_encode_count;
+
+bool audio_encoder_service_is_codec_available(AudioCodec codec) {
+  return (codec == AudioCodecSpeexWB);
+}
+
+bool audio_encoder_service_open(AudioCodec codec, PebbleTask owner, AudioEncoderInfo *info_out) {
+  if (s_encoder_open) {
+    return false;
+  }
+  s_encoder_open = true;
+  s_encoder_open_count++;
+  *info_out = (AudioEncoderInfo){
+    .codec = codec,
+    .channels = 1,
+    .frame_samples = FAKE_FRAME_SAMPLES,
+    .sample_rate = 16000,
+    .bitrate = 9800,
+    .max_packet_bytes = 200,
+    .bitstream_version = 4,
+  };
+  return true;
+}
+
+int audio_encoder_service_encode(PebbleTask owner, const int16_t *pcm, uint32_t num_samples,
+                                 uint8_t *out, uint32_t out_len) {
+  cl_assert(s_encoder_open);
+  cl_assert_equal_i(num_samples, FAKE_FRAME_SAMPLES);
+  s_encode_count++;
+  out[0] = (uint8_t)pcm[0];
+  return 25;
+}
+
+void audio_encoder_service_close(PebbleTask owner) {
+  if (s_encoder_open) {
+    s_encoder_close_count++;
+  }
+  s_encoder_open = false;
+}
+
+static AudioEndpointStopTransferCallback s_transfer_stop_cb;
+static AudioEndpointSessionId s_transfer_session;
+static int s_frames_sent;
+static uint8_t s_last_frame_byte;
+static int s_transfer_stopped_count;
+static int s_transfer_cancelled_count;
+
+AudioEndpointSessionId audio_endpoint_setup_transfer(AudioEndpointStopTransferCallback stop_cb) {
+  s_transfer_stop_cb = stop_cb;
+  return ++s_transfer_session;
+}
+
+void audio_endpoint_add_frame(AudioEndpointSessionId session_id, uint8_t *frame,
+                              uint8_t frame_size) {
+  cl_assert_equal_i(session_id, s_transfer_session);
+  cl_assert_equal_i(frame_size, 25);
+  s_frames_sent++;
+  s_last_frame_byte = frame[0];
+}
+
+void audio_endpoint_stop_transfer(AudioEndpointSessionId session_id) {
+  cl_assert_equal_i(session_id, s_transfer_session);
+  s_transfer_stopped_count++;
+}
+
+void audio_endpoint_cancel_transfer(AudioEndpointSessionId session_id) {
+  cl_assert_equal_i(session_id, s_transfer_session);
+  s_transfer_cancelled_count++;
+}
+
+static int s_setup_sessions;
+static VoiceEndpointSessionType s_setup_type;
+static bool s_setup_had_uuid;
+static uint16_t s_setup_frame_size;
+
+void voice_endpoint_setup_session(VoiceEndpointSessionType session_type,
+                                  AudioEndpointSessionId session_id, AudioTransferInfoSpeex *info,
+                                  Uuid *app_uuid) {
+  s_setup_sessions++;
+  s_setup_type = session_type;
+  s_setup_had_uuid = (app_uuid != NULL);
+  s_setup_frame_size = info->frame_size;
+  cl_assert_equal_i(session_id, s_transfer_session);
+}
 
 // Fake mic driver, driven by the tests
 ////////////////////////////////////////////////////////////////
@@ -126,6 +248,19 @@ void test_mic_capture_service__initialize(void) {
   s_mic_handler = NULL;
   s_permission_state = AppPermissionStateGranted;
   s_modal_focused = false;
+  s_md = (PebbleProcessMd){.is_unprivileged = true};
+  s_watchface_running = false;
+  s_encoder_open = false;
+  s_encoder_open_count = 0;
+  s_encoder_close_count = 0;
+  s_encode_count = 0;
+  s_transfer_stop_cb = NULL;
+  s_frames_sent = 0;
+  s_transfer_stopped_count = 0;
+  s_transfer_cancelled_count = 0;
+  s_setup_sessions = 0;
+  s_setup_had_uuid = false;
+  stub_new_timer_cleanup();
   mic_manager_init();
   mic_capture_service_init();
 }
@@ -134,6 +269,7 @@ void test_mic_capture_service__cleanup(void) {
   mic_capture_service_stop_for_task(PebbleTask_App);
   mic_manager_release(MicClientVoiceDictation);
   fake_mutex_assert_all_unlocked();
+  stub_new_timer_cleanup();
   fake_pbl_malloc_check_net_allocs();
 }
 
@@ -154,6 +290,12 @@ void test_mic_capture_service__start_refusals(void) {
   cl_assert_equal_i(MicCaptureStartErrNotForeground,
                     mic_capture_service_start(PebbleTask_App, SPU));
   s_modal_focused = false;
+
+  // Watchfaces are refused even with the permission granted, for capture and streaming alike
+  s_watchface_running = true;
+  cl_assert_equal_i(MicCaptureStartErrWatchface, mic_capture_service_start(PebbleTask_App, SPU));
+  cl_assert_equal_i(MicCaptureStartErrWatchface, mic_capture_service_start_stream(PebbleTask_App));
+  s_watchface_running = false;
 
   s_permission_state = AppPermissionStateNotDeclared;
   cl_assert_equal_i(MicCaptureStartErrNotDeclared, mic_capture_service_start(PebbleTask_App, SPU));
@@ -316,4 +458,121 @@ void test_mic_capture_service__stop_for_task(void) {
 
   // Can start again afterwards
   cl_assert_equal_i(MicCaptureStartOk, mic_capture_service_start(PebbleTask_App, SPU));
+}
+
+// Streaming to the phone
+////////////////////////////////////////////////////////////////
+
+static void prv_start_stream_ok(void) {
+  cl_assert_equal_i(MicCaptureStartOk, mic_capture_service_start_stream(PebbleTask_App));
+  cl_assert(mic_capture_service_is_active());
+  // Session requested, mic not started until the phone answers
+  cl_assert_equal_i(1, s_setup_sessions);
+  cl_assert_equal_i(s_setup_type, VoiceEndpointSessionTypeAudioStream);
+  cl_assert_equal_i(s_setup_frame_size, FAKE_FRAME_SAMPLES);
+  cl_assert_equal_i(1, s_encoder_open_count);
+  cl_assert(!s_mic_running);
+  cl_assert_equal_i(0, fake_event_get_count());
+}
+
+void test_mic_capture_service__stream_setup_and_data(void) {
+  prv_start_stream_ok();
+  cl_assert(s_setup_had_uuid); // a third-party app tags the session with its UUID
+
+  mic_capture_service_handle_stream_setup_result(VoiceEndpointResultSuccess);
+  cl_assert(s_mic_running);
+  cl_assert_equal_i(s_mic_buffer_len, FAKE_FRAME_SAMPLES);
+  cl_assert_equal_i(1, fake_event_get_count());
+  PebbleEvent e = prv_last_event();
+  cl_assert_equal_i(e.mic_capture.type, MicCaptureEventStarted);
+
+  // Chunks are encoded and forwarded, never buffered for the app
+  prv_deliver_chunk(42);
+  prv_deliver_chunk(43);
+  cl_assert_equal_i(2, s_encode_count);
+  cl_assert_equal_i(2, s_frames_sent);
+  cl_assert_equal_i(43, s_last_frame_byte);
+  cl_assert_equal_i(0, mic_capture_service_get_available());
+  int16_t out[8];
+  cl_assert_equal_i(0, mic_capture_service_read(PebbleTask_App, out, 8));
+  cl_assert_equal_i(1, fake_event_get_count());
+
+  // A duplicate setup answer is ignored
+  mic_capture_service_handle_stream_setup_result(VoiceEndpointResultSuccess);
+  cl_assert_equal_i(1, fake_event_get_count());
+
+  // App stops: transfer is ended politely, encoder closed, no event
+  mic_capture_service_stop(PebbleTask_App);
+  cl_assert(!mic_capture_service_is_active());
+  cl_assert(!s_mic_running);
+  cl_assert_equal_i(1, s_transfer_stopped_count);
+  cl_assert_equal_i(0, s_transfer_cancelled_count);
+  cl_assert_equal_i(1, s_encoder_close_count);
+  cl_assert_equal_i(1, fake_event_get_count());
+}
+
+void test_mic_capture_service__stream_refused_by_phone(void) {
+  prv_start_stream_ok();
+  mic_capture_service_handle_stream_setup_result(VoiceEndpointResultFailDisabled);
+  cl_assert(!mic_capture_service_is_active());
+  cl_assert(!s_mic_running);
+  cl_assert_equal_i(1, s_transfer_cancelled_count);
+  cl_assert_equal_i(1, s_encoder_close_count);
+  prv_assert_stopped_event(MicCaptureStopReasonPhone);
+}
+
+void test_mic_capture_service__stream_setup_timeout(void) {
+  prv_start_stream_ok();
+  cl_assert(stub_new_timer_fire(stub_new_timer_get_next()));
+  cl_assert(!mic_capture_service_is_active());
+  cl_assert_equal_i(1, s_transfer_cancelled_count);
+  prv_assert_stopped_event(MicCaptureStopReasonPhone);
+}
+
+void test_mic_capture_service__stream_stopped_by_phone(void) {
+  prv_start_stream_ok();
+  mic_capture_service_handle_stream_setup_result(VoiceEndpointResultSuccess);
+  cl_assert(s_mic_running);
+
+  s_transfer_stop_cb(s_transfer_session);
+  cl_assert(!mic_capture_service_is_active());
+  cl_assert(!s_mic_running);
+  // The endpoint already tore its side down; we must not send a stop back
+  cl_assert_equal_i(0, s_transfer_stopped_count);
+  cl_assert_equal_i(0, s_transfer_cancelled_count);
+  prv_assert_stopped_event(MicCaptureStopReasonPhone);
+}
+
+void test_mic_capture_service__stream_preempted_by_system(void) {
+  prv_start_stream_ok();
+  mic_capture_service_handle_stream_setup_result(VoiceEndpointResultSuccess);
+
+  mic_capture_service_handle_system_preempt();
+  cl_assert(!mic_capture_service_is_active());
+  cl_assert(!s_mic_running);
+  cl_assert_equal_i(MicClientNone, mic_manager_get_owner());
+  cl_assert_equal_i(1, s_transfer_stopped_count);
+  cl_assert_equal_i(1, s_encoder_close_count);
+  prv_assert_stopped_event(MicCaptureStopReasonPreempted);
+}
+
+void test_mic_capture_service__stream_refusals(void) {
+  s_permission_state = AppPermissionStateDenied;
+  cl_assert_equal_i(MicCaptureStartErrDenied, mic_capture_service_start_stream(PebbleTask_App));
+  s_permission_state = AppPermissionStateGranted;
+
+  cl_assert(prv_start_dictation());
+  cl_assert_equal_i(MicCaptureStartErrBusy, mic_capture_service_start_stream(PebbleTask_App));
+  mic_manager_release(MicClientVoiceDictation);
+
+  // Capture and stream are exclusive
+  cl_assert_equal_i(MicCaptureStartOk, mic_capture_service_start(PebbleTask_App, SPU));
+  cl_assert_equal_i(MicCaptureStartErrBusy, mic_capture_service_start_stream(PebbleTask_App));
+  mic_capture_service_stop(PebbleTask_App);
+  cl_assert_equal_i(0, s_setup_sessions);
+
+  // System apps stream without a UUID tag
+  s_md.is_unprivileged = false;
+  prv_start_stream_ok();
+  cl_assert(!s_setup_had_uuid);
 }

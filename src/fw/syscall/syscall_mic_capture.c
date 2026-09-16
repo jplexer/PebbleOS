@@ -17,6 +17,14 @@ DEFINE_SYSCALL(uint8_t, sys_mic_capture_start, uint16_t samples_per_update) {
 #endif
 }
 
+DEFINE_SYSCALL(uint8_t, sys_mic_capture_start_stream, void) {
+#ifdef CONFIG_SERVICE_MIC_CAPTURE
+  return (uint8_t)mic_capture_service_start_stream(pebble_task_get_current());
+#else
+  return (uint8_t)MicCaptureStartErrDenied;
+#endif
+}
+
 DEFINE_SYSCALL(void, sys_mic_capture_stop, void) {
 #ifdef CONFIG_SERVICE_MIC_CAPTURE
   mic_capture_service_stop(pebble_task_get_current());

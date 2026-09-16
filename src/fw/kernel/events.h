@@ -508,6 +508,7 @@ typedef struct PACKED { // 2 bytes
 typedef enum {
   MicCaptureEventData = 0,
   MicCaptureEventStopped = 1,
+  MicCaptureEventStarted = 2, //!< A stream to the phone is up
 } MicCaptureEventType;
 
 typedef struct PACKED { // 5 bytes

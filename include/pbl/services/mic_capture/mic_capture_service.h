@@ -12,8 +12,10 @@
 //!
 //! The service owns the mic (through mic_manager), a kernel ring buffer the app drains through
 //! syscalls, and the OS "listening" banner. It only ever serves the app task, only while the app
-//! is in focus and holds the microphone permission. Capture stops on any focus loss, when the
-//! grant is revoked, when dictation preempts the mic, or when the app goes away.
+//! is in focus and holds the microphone permission. Watchfaces are refused outright: they run
+//! unattended for hours, so nothing they declare or the user grants lets them record. Capture stops
+//! on any focus loss, when the grant is revoked, when dictation preempts the mic, or when the app
+//! goes away.
 //!
 //! Data flow: the mic driver hands chunks of samples_per_update samples on KernelBG; they are
 //! appended to the ring buffer (dropping the newest chunk when full) and a coalesced
@@ -27,6 +29,8 @@ typedef enum MicCaptureStartResult {
   MicCaptureStartErrNotForeground,
   MicCaptureStartErrInvalidArgs,
   MicCaptureStartErrNoMemory,
+  //! Watchfaces may never record
+  MicCaptureStartErrWatchface,
 } MicCaptureStartResult;
 
 typedef enum MicCaptureStopReason {
@@ -36,6 +40,8 @@ typedef enum MicCaptureStopReason {
   MicCaptureStopReasonPermissionRevoked,
   MicCaptureStopReasonAppExit,
   MicCaptureStopReasonError,
+  //! The phone refused, stopped or lost the stream
+  MicCaptureStopReasonPhone,
 } MicCaptureStopReason;
 
 #define MIC_CAPTURE_SAMPLE_RATE            (16000)
@@ -67,3 +73,15 @@ void mic_capture_service_handle_app_focus_lost(void);
 
 //! The running app's grants changed: capture stops if the mic is no longer granted.
 void mic_capture_service_handle_permission_changed(void);
+
+//! The system (dictation) is about to take the microphone and the phone-side audio session.
+void mic_capture_service_handle_system_preempt(void);
+
+//! Streams encoded audio straight to the phone instead of delivering PCM to the app. The
+//! phone's companion for the app receives it. Same rules as capture, plus a session handshake:
+//! MicCaptureEventStarted is posted once the phone accepted, and MicCaptureStopReasonPhone
+//! reported if it refuses, stops, or the setup times out.
+MicCaptureStartResult mic_capture_service_start_stream(PebbleTask owner);
+
+//! Result of the phone's answer to the stream session setup. Called by the voice endpoint.
+void mic_capture_service_handle_stream_setup_result(uint8_t voice_endpoint_result);

@@ -12,6 +12,9 @@
 #include "process_management/app_manager.h"
 #include "pbl/services/comm_session/session.h"
 #include "pbl/services/mic_manager.h"
+#ifdef CONFIG_SERVICE_MIC_CAPTURE
+#include "pbl/services/mic_capture/mic_capture_service.h"
+#endif
 #include "pbl/services/new_timer/new_timer.h"
 #include "pbl/services/audio_endpoint.h"
 #include "pbl/services/voice/transcription.h"
@@ -339,6 +342,10 @@ void voice_init(void) {
 // prv_session_setup_timeout)
 VoiceSessionId voice_start_dictation(VoiceEndpointSessionType session_type) {
   PBL_LOG_DBG("voice_start_dictation called with session_type: %d", session_type);
+#ifdef CONFIG_SERVICE_MIC_CAPTURE
+  // Dictation takes the mic, the encoder and the phone-side audio session away from any app.
+  mic_capture_service_handle_system_preempt();
+#endif
   pbl_mutex_lock(&s_lock, PBL_FOREVER);
 
   // Lazily initialize Speex encoder to avoid baseline memory usage when voice not used
