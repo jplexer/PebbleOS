@@ -103,6 +103,9 @@ uint8_t sys_speaker_get_state(void);
 void sys_speaker_register_finish(void);
 bool sys_speaker_is_muted(void);
 
+//! @return AppPermissionState for the running app
+uint8_t sys_app_permission_get_state(uint8_t permission);
+
 void sys_get_app_uuid(Uuid *uuid);
 bool sys_app_is_watchface(void);
 AppInstallId sys_app_manager_get_current_app_id(void);

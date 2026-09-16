@@ -4,7 +4,7 @@
               "You should also make sure you are obeying our API design guidelines:",
               "https://pebbletechnology.atlassian.net/wiki/display/DEV/SDK+API+Design+Guidelines"
             ],
-  "revision" : "109",
+  "revision" : "110",
   "version" : "2.0",
   "files": [
     "include/pbl/drivers/ambient_light.h",
@@ -135,7 +135,9 @@
     "fw/applib/voice/dictation_session.h",
     "fw/applib/ui/content_indicator.h",
     "fw/applib/rockyjs/rocky.h",
-    "fw/applib/unobstructed_area_service.h"
+    "fw/applib/unobstructed_area_service.h",
+    "include/pbl/services/app_permissions/app_permissions_types.h",
+    "fw/applib/app_permissions.h"
   ],
   "exports": [
     {
@@ -4744,6 +4746,39 @@
               "type": "function",
               "name": "speaker_is_muted",
               "addedRevision": "100"
+            }
+          ]
+        }, {
+          "type": "group",
+          "name": "Permissions",
+          "appOnly": true,
+          "addedRevision": "110",
+          "exports": [
+            {
+              "type": "type",
+              "name": "AppPermission"
+            }, {
+              "type": "type",
+              "name": "AppPermissionState"
+            }, {
+              "type": "type",
+              "name": "AppPermissionChangedHandler"
+            }, {
+              "type": "function",
+              "name": "app_permission_get_state",
+              "addedRevision": "110"
+            }, {
+              "type": "function",
+              "name": "app_permission_is_granted",
+              "addedRevision": "110"
+            }, {
+              "type": "function",
+              "name": "app_permission_service_subscribe",
+              "addedRevision": "110"
+            }, {
+              "type": "function",
+              "name": "app_permission_service_unsubscribe",
+              "addedRevision": "110"
             }
           ]
         }, {

@@ -81,6 +81,8 @@ typedef struct {
 
   ConnectionServiceState connection_service_state;
 
+  AppPermissionServiceState app_permission_service_state;
+
   HealthServiceState health_service_state;
 
   LocaleInfo locale_info;
@@ -307,6 +309,8 @@ NOINLINE void app_state_init(void) {
 
   connection_service_state_init(app_state_get_connection_service_state());
 
+  app_permission_service_state_init(app_state_get_app_permission_service_state());
+
   tick_timer_service_state_init(app_state_get_tick_timer_service_state());
 
   touch_service_state_init(app_state_get_touch_service_state());
@@ -438,6 +442,10 @@ TouchServiceState *app_state_get_touch_service_state(void) {
 
 ConnectionServiceState *app_state_get_connection_service_state(void) {
   return &s_app_state_ptr->connection_service_state;
+}
+
+AppPermissionServiceState *app_state_get_app_permission_service_state(void) {
+  return &s_app_state_ptr->app_permission_service_state;
 }
 
 HealthServiceState *app_state_get_health_service_state(void) {

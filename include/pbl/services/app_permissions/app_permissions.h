@@ -4,6 +4,7 @@
 #pragma once
 
 #include "pbl/services/app_permissions/app_permissions_types.h"
+#include "pbl/services/blob_db/app_permissions_db.h"
 #include "pbl/util/uuid.h"
 #include "system/status_codes.h"
 

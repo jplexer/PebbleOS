@@ -4,11 +4,28 @@
 #pragma once
 
 #include "pbl/services/app_permissions/app_permissions_types.h"
+#include "pbl/util/attributes.h"
 #include "pbl/util/uuid.h"
 #include "system/status_codes.h"
 
 #include <stdbool.h>
 #include <stdint.h>
+
+typedef uint32_t AppPermissionMask;
+
+#define APP_PERMISSION_BIT(permission) ((AppPermissionMask)1u << (permission))
+
+#define APP_PERMISSIONS_DB_ENTRY_VERSION (1)
+
+//! Serialized grant record pushed by the phone (BlobDBIdAppPermissions, keyed by app Uuid).
+typedef struct PACKED AppPermissionsDBEntry {
+  uint8_t version; //!< APP_PERMISSIONS_DB_ENTRY_VERSION
+  uint8_t reserved[3];
+  AppPermissionMask granted_mask;  //!< Permissions the user granted
+  AppPermissionMask declared_mask; //!< Permissions the app declared (informational)
+} AppPermissionsDBEntry;
+
+_Static_assert(sizeof(AppPermissionsDBEntry) == 12, "AppPermissionsDBEntry layout changed");
 
 //! Per-app permission grants, pushed by the phone and keyed by app Uuid.
 
