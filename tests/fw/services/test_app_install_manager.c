@@ -28,6 +28,7 @@
 // Stub Includes
 ////////////////////////////////////
 #include "stubs_analytics.h"
+#include "stubs_app_permissions_db.h"
 #include "stubs_app_manager.h"
 #include "stubs_app_state.h"
 #include "stubs_bootbits.h"
