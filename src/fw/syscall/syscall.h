@@ -4,6 +4,7 @@
 #pragma once
 
 #include "applib/app_comm.h"
+#include "pbl/services/audio_encoder/audio_encoder_types.h"
 #include "applib/app_exit_reason.h"
 #include "applib/app_inbox.h"
 #include "applib/app_outbox.h"
@@ -112,6 +113,13 @@ void sys_mic_capture_stop(void);
 uint32_t sys_mic_capture_read(int16_t *out, uint32_t max_samples);
 uint32_t sys_mic_capture_get_available(void);
 bool sys_mic_capture_is_active(void);
+
+//! App-owned speech encoder. See audio_encoder.h.
+bool sys_audio_encoder_codec_available(uint8_t codec);
+bool sys_audio_encoder_open(uint8_t codec, AudioEncoderInfo *info_out);
+int sys_audio_encoder_encode(const int16_t *pcm, uint32_t num_samples, uint8_t *out,
+                             uint32_t out_len);
+void sys_audio_encoder_close(void);
 
 void sys_get_app_uuid(Uuid *uuid);
 bool sys_app_is_watchface(void);

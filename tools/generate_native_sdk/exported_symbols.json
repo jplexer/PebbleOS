@@ -4,7 +4,7 @@
               "You should also make sure you are obeying our API design guidelines:",
               "https://pebbletechnology.atlassian.net/wiki/display/DEV/SDK+API+Design+Guidelines"
             ],
-  "revision" : "111",
+  "revision" : "112",
   "version" : "2.0",
   "files": [
     "include/pbl/drivers/ambient_light.h",
@@ -138,7 +138,9 @@
     "fw/applib/unobstructed_area_service.h",
     "include/pbl/services/app_permissions/app_permissions_types.h",
     "fw/applib/app_permissions.h",
-    "fw/applib/mic_data_service.h"
+    "fw/applib/mic_data_service.h",
+    "include/pbl/services/audio_encoder/audio_encoder_types.h",
+    "fw/applib/audio_encoder.h"
   ],
   "exports": [
     {
@@ -4824,6 +4826,36 @@
               "type": "function",
               "name": "mic_data_service_is_active",
               "addedRevision": "111"
+            }
+          ]
+        }, {
+          "type": "group",
+          "name": "AudioEncoder",
+          "appOnly": true,
+          "addedRevision": "112",
+          "exports": [
+            {
+              "type": "type",
+              "name": "AudioCodec"
+            }, {
+              "type": "type",
+              "name": "AudioEncoderInfo"
+            }, {
+              "type": "function",
+              "name": "audio_encoder_codec_available",
+              "addedRevision": "112"
+            }, {
+              "type": "function",
+              "name": "audio_encoder_open",
+              "addedRevision": "112"
+            }, {
+              "type": "function",
+              "name": "audio_encoder_encode_frame",
+              "addedRevision": "112"
+            }, {
+              "type": "function",
+              "name": "audio_encoder_close",
+              "addedRevision": "112"
             }
           ]
         }, {
