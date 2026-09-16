@@ -39,6 +39,9 @@
 #ifdef CONFIG_SERVICE_MIC_CAPTURE
 #include "pbl/services/mic_capture/mic_capture_service.h"
 #endif
+#ifdef CONFIG_SERVICE_AUDIO_ENCODER
+#include "pbl/services/audio_encoder/audio_encoder.h"
+#endif
 #endif
 #include "shell/normal/app_idle_timeout.h"
 #include "shell/normal/watchface.h"
@@ -417,9 +420,12 @@ static void prv_app_cleanup(void) {
   vibe_pattern_clear_for_owner(VibePatternOwner_App);
 #ifndef CONFIG_RECOVERY_FW
   speaker_service_stop_for_task(PebbleTask_App);
-#endif
 #ifdef CONFIG_SERVICE_MIC_CAPTURE
   mic_capture_service_stop_for_task(PebbleTask_App);
+#endif
+#ifdef CONFIG_SERVICE_AUDIO_ENCODER
+  audio_encoder_service_close_for_task(PebbleTask_App);
+#endif
 #endif
   ble_app_cleanup();
 

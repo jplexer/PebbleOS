@@ -305,6 +305,12 @@ pbl_clar_test(test_app_cache
   OVERRIDES dummy_board
 )
 
+pbl_clar_test(test_audio_encoder
+  SOURCES
+    src/fw/services/audio_encoder/audio_encoder.c
+  OVERRIDES dummy_board
+)
+
 pbl_clar_test(test_mic_manager
   SOURCES
     src/fw/services/mic_manager/mic_manager.c
