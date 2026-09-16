@@ -8,6 +8,7 @@
 #include "applib/app_inbox.h"
 #include "applib/app_message/app_message_internal.h"
 #include "applib/app_permissions_private.h"
+#include "applib/mic_data_service_private.h"
 #include "applib/app_wakeup.h"
 #include "applib/backlight_service_private.h"
 #include "applib/battery_state_service_private.h"
@@ -118,6 +119,8 @@ TouchServiceState *app_state_get_touch_service_state(void);
 ConnectionServiceState *app_state_get_connection_service_state(void);
 
 AppPermissionServiceState *app_state_get_app_permission_service_state(void);
+
+MicDataServiceState *app_state_get_mic_data_service_state(void);
 
 LocaleInfo *app_state_get_locale_info(void);
 

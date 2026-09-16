@@ -171,9 +171,10 @@ typedef enum {
 // app_touch_navigation_enable() opt-in for third-party touch nav (rev 108) sdk.major:0x5
 // .minor:0x6a -- Add HRV sampling API (health_service_set_hrv_sample_period) (rev 109)
 // sdk.major:0x5 .minor:0x6b -- Add app permissions API (rev 110)
+// sdk.major:0x5 .minor:0x6c -- Add Microphone API (mic_data_service_subscribe) (rev 111)
 
 #define PROCESS_INFO_CURRENT_SDK_VERSION_MAJOR 0x5
-#define PROCESS_INFO_CURRENT_SDK_VERSION_MINOR 0x6b
+#define PROCESS_INFO_CURRENT_SDK_VERSION_MINOR 0x6c
 
 // The first SDK to ship with 2.x APIs
 #define PROCESS_INFO_FIRST_2X_SDK_VERSION_MAJOR 0x4

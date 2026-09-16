@@ -106,6 +106,13 @@ bool sys_speaker_is_muted(void);
 //! @return AppPermissionState for the running app
 uint8_t sys_app_permission_get_state(uint8_t permission);
 
+//! Live microphone capture for the app task. See mic_capture_service.h.
+uint8_t sys_mic_capture_start(uint16_t samples_per_update);
+void sys_mic_capture_stop(void);
+uint32_t sys_mic_capture_read(int16_t *out, uint32_t max_samples);
+uint32_t sys_mic_capture_get_available(void);
+bool sys_mic_capture_is_active(void);
+
 void sys_get_app_uuid(Uuid *uuid);
 bool sys_app_is_watchface(void);
 AppInstallId sys_app_manager_get_current_app_id(void);
