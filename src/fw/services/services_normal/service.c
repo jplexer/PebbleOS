@@ -13,6 +13,7 @@
 #include "pbl/services/alarms/alarm.h"
 #include "pbl/services/app_cache.h"
 #include "pbl/services/app_glances/app_glance_service.h"
+#include "pbl/services/app_permissions/app_permissions.h"
 #include "pbl/services/blob_db/api.h"
 #include "pbl/services/blob_db/endpoint_private.h"
 #include "pbl/services/data_logging/data_logging_service.h"
@@ -125,6 +126,10 @@ void services_normal_init(void) {
 #endif
 
   app_glance_service_init();
+
+#ifdef CONFIG_SERVICE_APP_PERMISSIONS
+  app_permissions_init();
+#endif
 }
 
 static struct ServiceRunLevelSetting s_runlevel_settings[] = {
