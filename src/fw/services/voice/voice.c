@@ -11,6 +11,7 @@
 #include "pbl/kernel/mutex.h"
 #include "process_management/app_manager.h"
 #include "pbl/services/comm_session/session.h"
+#include "pbl/services/mic_manager.h"
 #include "pbl/services/new_timer/new_timer.h"
 #include "pbl/services/audio_endpoint.h"
 #include "pbl/services/voice/transcription.h"
@@ -118,7 +119,7 @@ static void prv_stop_recording(void) {
   // This prevents new frames from being added while the endpoint shuts down
   audio_endpoint_stop_transfer(s_session_id);
 
-  mic_stop(MIC);
+  mic_manager_release(MicClientVoiceDictation);
 
   prv_teardown_session();
 
@@ -127,7 +128,7 @@ static void prv_stop_recording(void) {
 
 static void prv_cancel_recording(void) {
   PBL_LOG_DBG("prv_cancel_recording called - cancelling mic and audio endpoint transfer");
-  mic_stop(MIC);
+  mic_manager_release(MicClientVoiceDictation);
 
   audio_endpoint_cancel_transfer(s_session_id);
   prv_teardown_session();
@@ -196,7 +197,8 @@ static bool prv_start_recording(void) {
 
   if (frame_buffer && frame_size_samples > 0) {
     PBL_LOG_DBG("Starting microphone with frame buffer");
-    if (!mic_start(MIC, &prv_audio_data_handler, NULL, frame_buffer, frame_size_samples)) {
+    if (!mic_manager_acquire(MicClientVoiceDictation, &prv_audio_data_handler, NULL, frame_buffer,
+                             frame_size_samples, NULL, NULL)) {
       PBL_LOG_ERR("Failed to start microphone for voice session");
       return false;
     }
