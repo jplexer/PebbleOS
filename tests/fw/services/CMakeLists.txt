@@ -320,6 +320,14 @@ pbl_clar_test(test_mic_manager
   OVERRIDES dummy_board
 )
 
+pbl_clar_test(test_mic_stream
+  SOURCES
+    fw/services/mic_stream/mic_stream.c
+    fw/services/mic_manager/mic_manager.c
+    tests/fakes/fake_events.c
+  OVERRIDES dummy_board
+)
+
 pbl_clar_test(test_app_install_manager
   SOURCES
     fw/flash_region/flash_region.c
