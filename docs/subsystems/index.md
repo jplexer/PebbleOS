@@ -10,6 +10,7 @@ it at link time, and a Kconfig option selects the backend.
 
 bluetooth.md
 crc.md
+fuel_gauge.md
 input.md
 logging.md
 shell.md
