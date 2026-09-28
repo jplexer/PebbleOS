@@ -14,6 +14,7 @@
 #include "pbl/services/app_cache.h"
 #include "pbl/services/app_glances/app_glance_service.h"
 #include "pbl/services/mic_manager.h"
+#include "pbl/services/mic_stream.h"
 #include "pbl/services/blob_db/api.h"
 #include "pbl/services/blob_db/endpoint_private.h"
 #include "pbl/services/data_logging/data_logging_service.h"
@@ -123,6 +124,9 @@ void services_normal_init(void) {
 
 #ifdef CONFIG_SERVICE_MIC_MANAGER
   mic_manager_init();
+#endif
+#ifdef CONFIG_SERVICE_MIC_STREAM
+  mic_stream_service_init();
 #endif
 #ifdef CONFIG_MIC
   voice_init();
