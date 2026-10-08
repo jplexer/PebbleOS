@@ -43,6 +43,9 @@
 #ifdef CONFIG_SERVICE_MIC_STREAM
 #include <pbl/services/mic_stream.h>
 #endif
+#ifdef CONFIG_SERVICE_MIC_CAPTURE
+#include <pbl/services/mic_capture.h>
+#endif
 #endif
 #include <pbl/logging/logging.h>
 #include <pbl/util/math.h>
@@ -452,6 +455,9 @@ static void prv_app_cleanup(void) {
   speaker_service_stop_for_task(PebbleTask_App);
 #ifdef CONFIG_SERVICE_MIC_STREAM
   mic_stream_service_stop_for_task(PebbleTask_App);
+#endif
+#ifdef CONFIG_SERVICE_MIC_CAPTURE
+  mic_capture_service_stop_for_task(PebbleTask_App);
 #endif
 #endif
   ble_app_cleanup();

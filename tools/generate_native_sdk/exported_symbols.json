@@ -4,7 +4,7 @@
               "You should also make sure you are obeying our API design guidelines:",
               "https://pebbletechnology.atlassian.net/wiki/display/DEV/SDK+API+Design+Guidelines"
             ],
-  "revision" : "110",
+  "revision" : "111",
   "version" : "2.0",
   "files": [
     "include/pbl/drivers/ambient_light.h",
@@ -125,7 +125,8 @@
     "fw/applib/ui/content_indicator.h",
     "fw/applib/rockyjs/rocky.h",
     "fw/applib/unobstructed_area_service.h",
-    "fw/applib/mic_stream.h"
+    "fw/applib/mic_stream.h",
+    "fw/applib/mic_capture.h"
   ],
   "exports": [
     {
@@ -4402,6 +4403,22 @@
               "name": "speaker_is_muted",
               "addedRevision": "100"
             }
+          ]
+        }, {
+          "type": "group",
+          "name": "LocalMicrophone",
+          "appOnly": true,
+          "addedRevision": "111",
+          "exports": [
+            { "type": "define", "name": "MIC_CAPTURE_SAMPLE_RATE" },
+            { "type": "type", "name": "MicCaptureStartResult" },
+            { "type": "type", "name": "MicCaptureStopReason" },
+            { "type": "type", "name": "MicCaptureDataHandler" },
+            { "type": "type", "name": "MicCaptureStoppedHandler" },
+            { "type": "type", "name": "MicCaptureHandlers" },
+            { "type": "function", "name": "mic_capture_start", "addedRevision": "111", "stubReturn": "MicCaptureStartErrUnavailable" },
+            { "type": "function", "name": "mic_capture_stop", "addedRevision": "111", "stubReturn": "void" },
+            { "type": "function", "name": "mic_capture_is_active", "addedRevision": "111" }
           ]
         }, {
           "type": "group",
