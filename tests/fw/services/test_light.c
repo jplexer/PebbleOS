@@ -31,7 +31,7 @@ extern const uint32_t INACTIVE_LIGHT_TIMEOUT_MS;
 // the time duration of the fade out
 extern const uint32_t LIGHT_FADE_TIME_MS;
 // number of fade-out steps
-extern const uint32_t LIGHT_FADE_STEPS;
+extern const uint8_t LIGHT_FADE_STEPS;
 
 // Stubs
 ///////////////////////////////////////////////////////////
