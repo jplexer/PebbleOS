@@ -100,6 +100,7 @@ pbl_clar_test(test_music_endpoint
     tests/fakes/fake_rtc.c
     fw/services/music/endpoint.c
     fw/services/music/service.c
+    fw/services/imaging/resident_image.c
 )
 
 pbl_clar_test(test_ping
@@ -111,6 +112,7 @@ pbl_clar_test(test_imaging
   SOURCES
     tests/fakes/fake_session.c
     fw/services/imaging/imaging.c
+    fw/services/imaging/resident_image.c
 )
 
 pbl_clar_test(test_analytics_native
