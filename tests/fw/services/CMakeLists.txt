@@ -439,3 +439,10 @@ pbl_clar_test(test_clock_time
   SOURCES
     tests/fakes/fake_rtc.c
 )
+
+pbl_clar_test(test_voice_speex
+  SOURCES fw/services/voice/voice_speex.c
+  LIBS speex
+  INCLUDES third_party/speex third_party/speex/speex/include
+  OVERRIDES dummy_board
+)

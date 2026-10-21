@@ -6,6 +6,7 @@
 
 #include <pbl/drivers/mic.h>
 #include <pbl/kernel/assert.h>
+#include <pbl/kernel/mutex.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/voice/voice_speex.h>
 
@@ -42,6 +43,9 @@ typedef struct {
 } VoiceSpeexEncoder;
 
 static VoiceSpeexEncoder s_encoder = {};
+// Guards the reference count, and the encoder setup and teardown
+static PBL_MUTEX_DEFINE(s_lock);
+static unsigned int s_users;
 
 // Speex configuration
 #define SPEEX_SAMPLE_RATE         16000 // 16 kHz wideband
@@ -51,7 +55,7 @@ static VoiceSpeexEncoder s_encoder = {};
 #define SPEEX_ENCODED_BUFFER_SIZE 320   // Max encoded frame size
 #define SPEEX_AUDIO_GAIN          3     // Audio gain multiplier (3x)
 
-bool voice_speex_init(void) {
+static bool prv_init(void) {
   if (s_encoder.initialized) {
     return true;
   }
@@ -135,7 +139,7 @@ bool voice_speex_init(void) {
   return true;
 }
 
-void voice_speex_deinit(void) {
+static void prv_deinit(void) {
   if (!s_encoder.initialized) {
     return;
   }
@@ -158,6 +162,28 @@ void voice_speex_deinit(void) {
   }
 
   memset(&s_encoder, 0, sizeof(s_encoder));
+}
+
+bool voice_speex_init(void) {
+  bool ok;
+
+  pbl_mutex_lock(&s_lock, PBL_FOREVER);
+  ok = prv_init();
+  if (ok) {
+    s_users++;
+  }
+  pbl_mutex_unlock(&s_lock);
+
+  return ok;
+}
+
+void voice_speex_deinit(void) {
+  pbl_mutex_lock(&s_lock, PBL_FOREVER);
+  PBL_ASSERTN(s_users > 0U);
+  if (--s_users == 0U) {
+    prv_deinit();
+  }
+  pbl_mutex_unlock(&s_lock);
 }
 
 void voice_speex_get_transfer_info(AudioTransferInfoSpeex *info) {
