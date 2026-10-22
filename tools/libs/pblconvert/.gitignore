@@ -1,8 +1,0 @@
-.idea
-*.pyc
-tests/examples/internal
-build
-dist
-pblconvert.egg-info
-.DS_Store
-.pytest_cache

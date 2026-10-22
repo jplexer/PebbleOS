@@ -1,1 +1,0 @@
-../../../resources/normal/base/js/tictoc~rect~bw.js

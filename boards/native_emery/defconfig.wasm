@@ -1,3 +1,0 @@
-# native_emery wasm board variant configuration
-
-CONFIG_POSIX_EMSCRIPTEN=y

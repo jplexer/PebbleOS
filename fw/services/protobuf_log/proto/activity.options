@@ -1,3 +1,0 @@
-# UUID is 32 letters plus 4 optional dashes, see:
-# 123e4567-e89b-12d3-a456-426655440000 (8-4-4-4-12)
-pebble.pipeline.ActivityType.custom_type max_size:36

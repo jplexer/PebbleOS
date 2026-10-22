@@ -1,9 +1,0 @@
-# SPDX-FileCopyrightText: 2026 Core Devices LLC
-# SPDX-License-Identifier: Apache-2.0
-
-qemu:
-  # SDL decorations the emulator can draw around the screen; the first one
-  # is the default.
-  decorations:
-    - p2d-bk
-    - p2d-wh
