@@ -7,3 +7,13 @@ config FLASH_SPI_NOR_GD25LQ255E
     default y
 
 endif
+
+if FUEL_GAUGE_THEVENIN
+
+config FUEL_GAUGE_THEVENIN_RC_MILLIOHM
+    default 561
+
+config FUEL_GAUGE_THEVENIN_RC_TAU_MS
+    default 98169
+
+endif
