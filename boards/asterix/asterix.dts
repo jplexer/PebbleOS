@@ -24,6 +24,16 @@
 		constant-charge-current-max-microamp = <128000>;
 		charge-term-current-microamp = <12800>;
 		constant-charge-voltage-max-microvolt = <4200000>;
+		charge-full-design-microamp-hours = <122510>;
+		factory-internal-resistance-micro-ohms = <1575871>;
+		ocv-capacity-celsius = <25>;
+		ocv-capacity-table-0 = <4117421 100>, <4083015 95>, <4055718 90>, <4009609 85>,
+				       <3963089 80>, <3923718 75>, <3888335 70>, <3848258 65>,
+				       <3800748 60>, <3753894 55>, <3711690 50>, <3675617 45>,
+				       <3646382 40>, <3620805 35>, <3595291 30>, <3566307 25>,
+				       <3532416 20>, <3489071 15>, <3438454 10>, <3419612 8>,
+				       <3378756 5>, <3302919 3>, <3255470 2>, <3171937 1>,
+				       <3043800 0>;
 	};
 
 	backlight: backlight {

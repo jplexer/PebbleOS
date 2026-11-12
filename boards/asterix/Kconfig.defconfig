@@ -11,3 +11,13 @@ config FW_FLASH_SIZE
 # The bootloader starts the watchdog, which cannot be stopped.
 config WATCHDOG
     default y
+
+if FUEL_GAUGE_THEVENIN
+
+config FUEL_GAUGE_THEVENIN_RC_MILLIOHM
+    default 561
+
+config FUEL_GAUGE_THEVENIN_RC_TAU_MS
+    default 98169
+
+endif
